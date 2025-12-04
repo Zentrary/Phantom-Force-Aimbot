@@ -1,47 +1,81 @@
 # Phantom Force Aimbot (Color Tracking)
 
+ภาษาไทย (TH) | English (EN)
+
+---
+
+## ภาษาไทย (TH)
+
 ภาพรวมของโปรแกรมที่ช่วยเล็งโดยอิงจากสีเป้าหมายบนหน้าจอ ใช้ OpenCV + MSS จับภาพบริเวณกลางจอ แล้วสร้างมาสก์สีเพื่อหาเป้าหมาย จากนั้นขยับเมาส์อย่างนุ่มนวลด้วยตัวกรองและการปรับพารามิเตอร์แบบไดนามิก
 
 ![หน้าจอโปรแกรม](image.png)
 
-## ฟีเจอร์หลัก
+### ฟีเจอร์หลัก
 - ปรับ UI ใหม่ให้เรียบง่ายและสมดุล พร้อมสลับภาษา Eng/TH
 - ปุ่มเริ่มทำงานทันที (ไม่ต้องยืนยัน)
 - FOV เริ่มต้นไม่ถูกติ๊ก สามารถเปิด/ปิดได้จาก UI
-- วิเคราะห์สีจากโฟลเดอร์ `images` เพื่อดึง “สีที่พบบ่อย” มาใช้ล็อคเป้าอัตโนมัติ
+- วิเคราะห์สีจากโฟลเดอร์ `images` เพื่อดึงสีที่พบบ่อยมาใช้ล็อคเป้าอัตโนมัติ
 - คลิกสองครั้งที่รายการสีเพื่อ Apply สีทันทีในช่อง Hex
-- คะแนนความเชื่อมั่นรวม (สีตรง + ความแน่นรูปร่าง + ความใกล้ crosshair) เพื่อเลือกเป้าหมายที่ดีที่สุด
-- Kalman filter ช่วยทำนายตำแหน่ง ทำให้การเคลื่อนที่นิ่งขึ้น
-- Gate หลายเฟรมก่อนขยับเมาส์ ลดการล็อคผิดเป้าชั่วคราว
+- คะแนนความเชื่อมั่นรวม (สีตรง + ความแน่นรูปร่าง + ความใกล้ crosshair)
+- Kalman filter ทำนายตำแหน่ง เพิ่มความนิ่ง
+- Gate หลายเฟรมก่อนขยับเมาส์ ลดล็อคผิดเป้า
 - ปรับ `FOV` และ `Deadzone` แบบไดนามิกตามความเชื่อมั่น
-- หน้าต่างพรีวิวมาสก์แบบเรียลไทม์เพื่อปรับสีให้ตรง
-- เรียนรู้สีอัตโนมัติระหว่างใช้งาน ปรับช่วงสีโดยอิงจากตัวอย่างจริง
+- หน้าต่างพรีวิวมาสก์แบบเรียลไทม์
+- เรียนรู้สีอัตโนมัติระหว่างใช้งาน
 
-## วิธีใช้งาน
-1. ติดตั้ง Python 3.9+ และไลบรารีที่จำเป็น:
-   - `opencv-python`, `numpy`, `mss`, `pywin32`
-2. รันโปรแกรมด้วย `python main.py`
-3. ไปที่แท็บ “การตั้งค่าสี / พาเลต”:
-   - กด “วิเคราะห์ images” เพื่อดึงสีที่พบบ่อยจากโฟลเดอร์ `images`
-   - ดับเบิลคลิกสีในรายการเพื่อ Apply สีทันที
-4. ปรับพารามิเตอร์ในแท็บ “พารามิเตอร์การทำงาน” เช่น Lock, Smooth, Max step, Deadzone, FOV
-5. ในกรอบ “ควบคุม / สถานะ”:
-   - กด “เริ่ม” เพื่อให้ระบบทำงาน
-   - ติ๊ก “แสดง FOV” เพื่อแสดงวง FOV บนหน้าจอ
-   - เปิด “หน้าต่างพรีวิวมาสก์” เพื่อตรวจสอบว่ามาสก์สีจับได้ดี
-   - เปิด “ปรับช่วงสีอัตโนมัติ” และ “FOV/Deadzone ไดนามิก” ตามความต้องการ
+### วิธีใช้งาน
+1. ติดตั้ง Python 3.9+: `opencv-python`, `numpy`, `mss`, `pywin32`
+2. รันโปรแกรม: `python main.py`
+3. ไปที่แท็บสี กด “วิเคราะห์ images” และดับเบิลคลิกสีเพื่อ Apply
+4. ปรับ Lock, Smooth, Max step, Deadzone, FOV ในแท็บพารามิเตอร์
+5. กรอบควบคุม: เริ่ม, แสดง FOV, พรีวิวมาสก์, ปรับช่วงสีอัตโนมัติ, FOV/Deadzone ไดนามิก
 
-## ปุ่มและคีย์ลัด
-- Toggle aim: `F7` (สามารถปรับในโค้ดตัวแปร `toggle_key`)
-- กดเมาส์ขวาเพื่อทำงานตรวจจับและเล็ง
+### ปุ่มและคีย์ลัด
+- Toggle aim: `F7`
+- ขยับเมื่อกดเมาส์ขวา
 
-## แนวทางปรับให้แม่นขึ้น
-- เพิ่มค่า `Smooth` เพื่อให้การขยับนุ่มขึ้น
-- ลด `Deadzone` เมื่ออยากให้ตอบสนองไวขึ้น แต่ระวังความสั่น
-- ใช้ “วิเคราะห์ images” เพื่อให้ช่วงสีตรงกับสถานการณ์จริง
-- เปิด “ปรับช่วงสีอัตโนมัติ” ให้ระบบปรับตัวตามฉากในเกม
+### แนวทางปรับให้แม่นขึ้น
+- เพิ่ม `Smooth` ให้นุ่มขึ้น, ลด `Deadzone` ให้ไวขึ้น
+- ใช้ “วิเคราะห์ images” และเปิด “ปรับช่วงสีอัตโนมัติ” เพื่อให้ระบบปรับตามฉากจริง
 
-## ข้อกำหนดและความเข้ากันได้
-- Windows เท่านั้น (ใช้ `win32api`, `winsound` และ overlay ของ Tk)
-- แนะนำจอ Full HD หรือปรับขนาดจับภาพในคลาส `Config`
+### ข้อกำหนด
+- Windows เท่านั้น; จอแนะนำ Full HD หรือปรับใน `Config`
 
+---
+
+## English (EN)
+
+Overview: color-based aiming assistant using OpenCV + MSS. It captures a centered screen region, builds a color mask to locate targets, then moves the mouse smoothly with filters and dynamic parameter adjustments.
+
+![App screenshot](image.png)
+
+### Key Features
+- Clean, balanced UI with language toggle (EN/TH)
+- Instant start button (no confirmation dialog)
+- FOV unchecked by default, toggleable in UI
+- Image folder analysis to auto-pick dominant colors for locking
+- Double-click palette items to apply Hex instantly
+- Confidence scoring (color match + solidity + proximity)
+- Kalman filter prediction for steadier motion
+- Multi-frame gate before mouse movement
+- Dynamic `FOV` and `Deadzone` based on confidence
+- Real-time mask preview window
+- Online auto color learning while in use
+
+### Usage
+1. Install Python 3.9+: `opencv-python`, `numpy`, `mss`, `pywin32`
+2. Run: `python main.py`
+3. Color tab: click “Analyze images” then double-click a color to apply
+4. Tune Lock, Smooth, Max step, Deadzone, FOV in Parameters tab
+5. Controls: Start, Show FOV, Mask Preview, Auto Color Learn, Dynamic FOV/Deadzone
+
+### Keys
+- Toggle aim: `F7`
+- Aiming when holding right mouse button
+
+### Tuning Tips
+- Increase `Smooth` for softer motion; reduce `Deadzone` for faster response
+- Use image analysis and enable auto color learning for in-game adaptation
+
+### Requirements
+- Windows only; Full HD screen recommended or adjust capture size in `Config`
