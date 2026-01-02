@@ -11,11 +11,16 @@ import threading
 import tkinter as tk
 from tkinter import filedialog, ttk
 import os
+import json
 
 class Config:
     def __init__(self):
-        self.width = 1920
-        self.height = 1080
+        try:
+            self.width = win32api.GetSystemMetrics(0)
+            self.height = win32api.GetSystemMetrics(1)
+        except:
+            self.width = 1920
+            self.height = 1080
         self.center_x = self.width // 2
         self.center_y = self.height // 2
         self.uniformCaptureSize = 240
@@ -80,6 +85,12 @@ toggle_key = 0x77
 prev_toggle_state = 0
 fov_radius = 80
 lock_strength = 1.0
+offset_x = 0
+offset_y = 0
+trigger_enabled = False
+trigger_distance = 5
+toggle_key = 0x77  # Default F8 (VK_F8)
+trigger_key = 0x79 # Default F10
 active_ranges = []
 running = False
 worker = None
@@ -176,13 +187,15 @@ def analyze_folder_colors(folder, k=8, max_images=50, sample_per_image=4000):
     return res
 
 def run_loop():
-    global running, track_cx, track_cy, prev_toggle_state, ema_dx, ema_dy, prev_err_x, prev_err_y, lock_cx, lock_cy, aim_enabled
+    global running, track_cx, track_cy, prev_toggle_state, ema_dx, ema_dy, prev_err_x, prev_err_y, lock_cx, lock_cy, aim_enabled, trigger_enabled
     running = True
     s = mss.mss()
     while running:
         time.sleep(0.001)
         GameFrame = np.array(s.grab(regionC))
         GameFrame = cv2.cvtColor(GameFrame, cv2.COLOR_BGRA2BGR)
+        
+        # Toggle Aim
         tk_state = win32api.GetAsyncKeyState(toggle_key)
         if tk_state < 0 and prev_toggle_state >= 0:
             aim_enabled = not aim_enabled
@@ -191,6 +204,11 @@ def run_loop():
             except Exception:
                 pass
         prev_toggle_state = tk_state
+        
+        # Trigger Toggle (Separate Key Check example, or UI Toggle)
+        # For now, let's keep trigger enabled via UI checkbox only to avoid key clutter, 
+        # or check a specific key if requested. Let's stick to UI variable for enable/disable logic first.
+
         if win32api.GetAsyncKeyState(0x6) < 0:
             try:
                 winsound.Beep(1000, 10)
@@ -226,8 +244,22 @@ def run_loop():
                     cx, cy, area, _ = chosen
                     track_cx, track_cy = cx, cy
                     lock_cx, lock_cy = cx, cy
-                    err_x = (-(crosshairU - cx))
-                    err_y = (-(crosshairU - cy))
+                    
+                    # Triggerbot Logic
+                    if trigger_enabled and aim_enabled:
+                         dist_sq = (crosshairU - cx)**2 + (crosshairU - cy)**2
+                         if dist_sq <= trigger_distance**2:
+                             win32api.mouse_event(win32con.MOUSEEVENTF_LEFTDOWN, 0, 0, 0, 0)
+                             time.sleep(0.01)
+                             win32api.mouse_event(win32con.MOUSEEVENTF_LEFTUP, 0, 0, 0, 0)
+                             time.sleep(0.05) # Delay between shots
+
+                    # Apply Offset
+                    target_x = cx + offset_x
+                    target_y = cy + offset_y
+                    
+                    err_x = (-(crosshairU - target_x))
+                    err_y = (-(crosshairU - target_y))
                     if abs(err_x) < deadzone_px:
                         err_x = 0.0
                     if abs(err_y) < deadzone_px:
@@ -352,12 +384,21 @@ def auto_detect_colors_from_folder():
     update_swatch(swatch_canvas, cols[0])
 
 def update_params(*args):
-    global lock_strength, smooth_alpha, max_step_px, deadzone_px, fov_radius
+    global lock_strength, smooth_alpha, max_step_px, deadzone_px, fov_radius, offset_x, offset_y
     lock_strength = float(strength_var.get())
     smooth_alpha = float(stability_var.get())
     max_step_px = int(max_step_var.get())
     deadzone_px = int(deadzone_var.get())
     fov_radius = int(fov_var.get())
+    offset_x = int(offset_x_var.get())
+    offset_y = int(offset_y_var.get())
+    global trigger_enabled, trigger_distance, toggle_key
+    trigger_enabled = trigger_var.get()
+    trigger_distance = int(trigger_dist_var.get())
+    try:
+        toggle_key = int(aim_key_var.get(), 16)
+    except:
+        pass
     update_overlay()
 
 def ensure_overlay():
@@ -405,41 +446,55 @@ def hide_overlay():
 
 LANG_TEXT = {
     'TH': {
-        'frame_color': '🎨 การตั้งค่าสี / พาเลต',
+        'frame_color': 'การตั้งค่าสี / พาเลต',
         'hex': 'รหัสสี:',
         'apply_hex': 'ใช้สี',
         'choose_image': 'เลือกรูปภาพ',
         'analyze_images': 'วิเคราะห์ images',
         'lock_colors': 'ล็อคสีที่เลือก',
-        'frame_params': '⚙️ พารามิเตอร์การทำงาน',
+        'frame_params': 'พารามิเตอร์การทำงาน',
         'lock': 'แรงดูด (Lock)',
         'smooth': 'ความนิ่ง (Smooth)',
         'max_step': 'Max Step',
         'deadzone': 'Deadzone',
         'fov': 'FOV Radius',
-        'frame_controls': '🕹️ ควบคุม / สถานะ',
-        'start': '✅ เริ่มการทำงาน',
-        'stop': '❌ หยุดการทำงาน',
+        'offset_x': 'Offset X',
+        'offset_y': 'Offset Y',
+        'frame_trigger': 'Triggerbot / Hotkeys',
+        'trigger_enable': 'เปิดใช้งาน Triggerbot',
+        'trigger_dist': 'ระยะทำงาน (px)',
+        'hotkey_aim': 'ปุ่ม Aim (Hex):',
+        'hotkey_trigger': 'ปุ่ม Trigger (Hex):',
+        'frame_controls': 'ควบคุม / สถานะ',
+        'start': 'เริ่มการทำงาน',
+        'stop': 'หยุดการทำงาน',
         'show_fov': 'แสดง FOV Overlay',
         'frame_status': 'สถานะ',
         'lang_button': 'ภาษา: ไทย'
     },
     'EN': {
-        'frame_color': '🎨 Color / Palette Settings',
+        'frame_color': 'Color / Palette Settings',
         'hex': 'Hex:',
         'apply_hex': 'Apply Hex',
         'choose_image': 'Pick Image',
         'analyze_images': 'Analyze images',
         'lock_colors': 'Lock Selected Colors',
-        'frame_params': '⚙️ Operation Parameters',
+        'frame_params': 'Operation Parameters',
         'lock': 'Lock Strength',
         'smooth': 'Smoothness',
         'max_step': 'Max Step',
         'deadzone': 'Deadzone',
         'fov': 'FOV Radius',
-        'frame_controls': '🕹️ Controls / Status',
-        'start': '✅ Start',
-        'stop': '❌ Stop',
+        'offset_x': 'Offset X',
+        'offset_y': 'Offset Y',
+        'frame_trigger': 'Triggerbot / Hotkeys',
+        'trigger_enable': 'Enable Triggerbot',
+        'trigger_dist': 'Trigger Distance',
+        'hotkey_aim': 'Aim Key (Hex)',
+        'hotkey_trigger': 'Trigger Key (Hex)',
+        'frame_controls': 'Controls / Status',
+        'start': 'Start',
+        'stop': 'Stop',
         'show_fov': 'Show FOV Overlay',
         'frame_status': 'Status',
         'lang_button': 'Language: English'
@@ -448,151 +503,298 @@ LANG_TEXT = {
 
 def apply_language():
     t = LANG_TEXT[lang_var.get()]
-    frame_color.configure(text=t['frame_color'])
+    label_title_color.configure(text=t['frame_color'])
     hex_label.configure(text=t['hex'])
     apply_hex_btn.configure(text=t['apply_hex'])
     choose_image_btn.configure(text=t['choose_image'])
     analyze_images_btn.configure(text=t['analyze_images'])
     lock_colors_btn.configure(text=t['lock_colors'])
-    frame_params.configure(text=t['frame_params'])
+    
+    label_title_params.configure(text=t['frame_params'])
     label_lock.configure(text=t['lock'])
     label_smooth.configure(text=t['smooth'])
     label_max_step.configure(text=t['max_step'])
     label_deadzone.configure(text=t['deadzone'])
     label_fov.configure(text=t['fov'])
-    frame_controls.configure(text=t['frame_controls'])
+    label_offset_x.configure(text=t['offset_x'])
+    label_offset_y.configure(text=t['offset_y'])
+    
+    label_title_trigger.configure(text=t['frame_trigger'])
+    chk_trigger.configure(text=t['trigger_enable'])
+    label_trigger_dist.configure(text=t['trigger_dist'])
+    label_hotkey_aim.configure(text=t['hotkey_aim'])
+    
+    label_title_controls.configure(text=t['frame_controls'])
     start_btn.configure(text=t['start'])
     stop_btn.configure(text=t['stop'])
     show_fov_chk.configure(text=t['show_fov'])
-    frame_status.configure(text=t['frame_status'])
     lang_btn.configure(text=t['lang_button'])
 
 def toggle_language():
     lang_var.set('EN' if lang_var.get() == 'TH' else 'TH')
     apply_language()
 
+import customtkinter
 
-root = tk.Tk()
+# Color Theme - Grey/Black
+BG_DARK = "#121212"
+BG_MEDIUM = "#1E1E1E"
+BG_LIGHT = "#252525"
+PRIMARY_PURPLE = "#404040"
+PRIMARY_PURPLE_HOVER = "#505050"
+ACCENT_RED = "#E94560"
+TEXT_LIGHT = "#FFFFFF"
+TEXT_GRAY = "#C0C0C0"
+
+customtkinter.set_appearance_mode("Dark")
+customtkinter.set_default_color_theme("dark-blue")
+
+root = customtkinter.CTk()
 root.title("Color Aimbot")
-root.geometry('650x500')
-style = ttk.Style(root)
-try:
-    style.theme_use('clam')
-except Exception:
-    pass
+root.geometry('700x605')
+root.resizable(False, False)
+root.configure(fg_color=BG_DARK)
 
-hex_var = tk.StringVar(value="#feffb2")
-tol_h_var = tk.IntVar(value=10)
-tol_s_var = tk.IntVar(value=60)
-tol_v_var = tk.IntVar(value=60)
-strength_var = tk.DoubleVar(value=1.0)
-stability_var = tk.DoubleVar(value=smooth_alpha)
-max_step_var = tk.IntVar(value=max_step_px)
-deadzone_var = tk.IntVar(value=deadzone_px)
-fov_var = tk.IntVar(value=fov_radius)
-show_fov_var = tk.BooleanVar(value=False)
-status_var = tk.StringVar(value='Stopped')
-lang_var = tk.StringVar(value='TH')
+hex_var = customtkinter.StringVar(value="#feffb2")
+tol_h_var = customtkinter.IntVar(value=10)
+tol_s_var = customtkinter.IntVar(value=60)
+tol_v_var = customtkinter.IntVar(value=60)
+strength_var = customtkinter.DoubleVar(value=1.0)
+stability_var = customtkinter.DoubleVar(value=smooth_alpha)
+max_step_var = customtkinter.IntVar(value=max_step_px)
+deadzone_var = customtkinter.IntVar(value=deadzone_px)
+fov_var = customtkinter.IntVar(value=fov_radius)
+offset_x_var = customtkinter.IntVar(value=0)
+offset_y_var = customtkinter.IntVar(value=0)
+trigger_var = customtkinter.BooleanVar(value=False)
+trigger_dist_var = customtkinter.IntVar(value=5)
+aim_key_var = customtkinter.StringVar(value="0x77")
+show_fov_var = customtkinter.BooleanVar(value=False)
+status_var = customtkinter.StringVar(value='Stopped')
+lang_var = customtkinter.StringVar(value='TH')
 
-root.columnconfigure(0, weight=1, uniform="group1")
-root.columnconfigure(1, weight=1, uniform="group1")
-root.rowconfigure(0, weight=1)
+root.grid_columnconfigure(0, weight=1)
+root.grid_columnconfigure(1, weight=1)
+root.grid_rowconfigure(0, weight=1)
 
-left_col = ttk.Frame(root, padding=(8, 8, 4, 8))
-left_col.grid(row=0, column=0, sticky='nsew')
-left_col.columnconfigure(0, weight=1)
-left_col.rowconfigure(0, weight=1)
-left_col.rowconfigure(1, weight=1)
+left_col = customtkinter.CTkFrame(root, fg_color=BG_MEDIUM)
+left_col.grid(row=0, column=0, sticky='nsew', padx=10, pady=10)
+left_col.grid_columnconfigure(0, weight=1)
 
-right_col = ttk.Frame(root, padding=(4, 8, 8, 8))
-right_col.grid(row=0, column=1, sticky='nsew')
-right_col.columnconfigure(0, weight=1)
-right_col.rowconfigure(0, weight=1)
-right_col.rowconfigure(1, weight=1)
+right_col = customtkinter.CTkFrame(root, fg_color=BG_MEDIUM)
+right_col.grid(row=0, column=1, sticky='nsew', padx=10, pady=10)
+right_col.grid_columnconfigure(0, weight=1)
 
+# --- Left Column: Color Settings ---
+frame_color = customtkinter.CTkFrame(left_col, fg_color=BG_LIGHT)
+frame_color.grid(row=0, column=0, sticky='nsew', padx=10, pady=10)
+frame_color.grid_columnconfigure(0, weight=1)
 
-frame_color = ttk.LabelFrame(left_col, text='🎨 การตั้งค่าสี / พาเลต', padding=(10, 10))
-frame_color.grid(row=0, column=0, rowspan=2, sticky='nsew', pady=(6, 12))
-frame_color.columnconfigure(0, weight=1)
-frame_color.columnconfigure(1, weight=1)
+label_title_color = customtkinter.CTkLabel(frame_color, text="🎨 การตั้งค่าสี / พาเลต", font=("Roboto", 16, "bold"))
+label_title_color.grid(row=0, column=0, columnspan=2, pady=(10, 5), sticky="w", padx=10)
 
-row1 = ttk.Frame(frame_color)
-row1.grid(row=0, column=0, columnspan=2, sticky='w', pady=(0, 10))
-hex_label = ttk.Label(row1, text='รหัสสี:')
+row1 = customtkinter.CTkFrame(frame_color, fg_color="transparent")
+row1.grid(row=1, column=0, columnspan=2, sticky='w', pady=(0, 10), padx=10)
+
+hex_label = customtkinter.CTkLabel(row1, text='รหัสสี:')
 hex_label.pack(side='left', padx=(0, 4))
-hex_entry = ttk.Entry(row1, textvariable=hex_var, width=10)
+
+hex_entry = customtkinter.CTkEntry(row1, textvariable=hex_var, width=80, fg_color=BG_MEDIUM, border_color=PRIMARY_PURPLE)
 hex_entry.pack(side='left', padx=(0, 6))
-apply_hex_btn = ttk.Button(row1, text='ใช้สี', command=set_from_hex, width=8)
+
+apply_hex_btn = customtkinter.CTkButton(row1, text='ใช้สี', command=set_from_hex, width=60, fg_color=PRIMARY_PURPLE, hover_color=PRIMARY_PURPLE_HOVER)
 apply_hex_btn.pack(side='left', padx=(0, 10))
-swatch_canvas = tk.Canvas(row1, width=48, height=24, highlightthickness=1, highlightbackground="#999999")
+
+swatch_canvas = tk.Canvas(row1, width=48, height=24, highlightthickness=1, highlightbackground=BG_MEDIUM, bg=BG_MEDIUM)
 swatch_canvas.pack(side='left')
 update_swatch(swatch_canvas, hex_var.get())
 
-palette_frame = ttk.Frame(frame_color)
-palette_frame.grid(row=1, column=0, columnspan=2, sticky='nsew')
-palette_frame.columnconfigure(0, weight=1)
-palette_frame.rowconfigure(0, weight=1)
+palette_frame = customtkinter.CTkFrame(frame_color, fg_color="transparent")
+palette_frame.grid(row=2, column=0, columnspan=2, sticky='nsew', padx=10)
+palette_frame.grid_columnconfigure(0, weight=1)
 
-palette_list = tk.Listbox(palette_frame, selectmode="multiple", height=6)
+palette_list = tk.Listbox(palette_frame, selectmode="multiple", height=8, bg=BG_MEDIUM, fg=TEXT_LIGHT, borderwidth=0, highlightthickness=0)
 palette_list.grid(row=0, column=0, sticky='nsew', padx=(0, 6))
 palette_list.bind('<<ListboxSelect>>', on_palette_select)
 palette_list.bind('<Double-Button-1>', on_palette_double_click)
-palette_canvas = tk.Canvas(palette_frame, width=48, height=120, highlightthickness=1, highlightbackground="#999999")
+
+palette_canvas = tk.Canvas(palette_frame, width=48, height=140, highlightthickness=1, highlightbackground=BG_MEDIUM, bg=BG_MEDIUM)
 palette_canvas.grid(row=0, column=1, sticky='ns')
 
-btns_palette = ttk.Frame(frame_color)
-btns_palette.grid(row=2, column=0, columnspan=2, sticky='ew', pady=(10, 0))
-choose_image_btn = ttk.Button(btns_palette, text='เลือกรูปภาพ', command=choose_image)
-choose_image_btn.pack(side='left', fill='x', expand=True)
-analyze_images_btn = ttk.Button(btns_palette, text='วิเคราะห์ images', command=auto_detect_colors_from_folder)
-analyze_images_btn.pack(side='left', padx=(6, 0), fill='x', expand=True)
-lock_colors_btn = ttk.Button(btns_palette, text='ล็อคสีที่เลือก', command=lock_selected_colors)
-lock_colors_btn.pack(side='left', padx=(6, 0), fill='x', expand=True)
+btns_palette = customtkinter.CTkFrame(frame_color, fg_color="transparent")
+btns_palette.grid(row=3, column=0, columnspan=2, sticky='ew', pady=(10, 10), padx=10)
+btns_palette.grid_columnconfigure(0, weight=1)
+btns_palette.grid_columnconfigure(1, weight=1)
+
+choose_image_btn = customtkinter.CTkButton(btns_palette, text='เลือกรูปภาพ', command=choose_image, fg_color=PRIMARY_PURPLE, hover_color=PRIMARY_PURPLE_HOVER)
+choose_image_btn.grid(row=0, column=0, sticky='ew', padx=(0, 5), pady=(0, 5))
+
+analyze_images_btn = customtkinter.CTkButton(btns_palette, text='วิเคราะห์ images', command=auto_detect_colors_from_folder, fg_color=PRIMARY_PURPLE, hover_color=PRIMARY_PURPLE_HOVER)
+analyze_images_btn.grid(row=0, column=1, sticky='ew', padx=(5, 0), pady=(0, 5))
+
+lock_colors_btn = customtkinter.CTkButton(btns_palette, text='ล็อคสี', command=lock_selected_colors, fg_color=PRIMARY_PURPLE, hover_color=PRIMARY_PURPLE_HOVER)
+lock_colors_btn.grid(row=1, column=0, columnspan=2, sticky='ew', padx=0, pady=0)
 
 
-frame_params = ttk.LabelFrame(right_col, text='⚙️ พารามิเตอร์การทำงาน', padding=(10, 10))
-frame_params.grid(row=0, column=0, sticky='new', pady=6)
-frame_params.columnconfigure(1, weight=1)
+# --- Right Column: Parameters ---
+frame_params = customtkinter.CTkFrame(right_col, fg_color=BG_LIGHT)
+frame_params.grid(row=0, column=0, sticky='new', padx=10, pady=10)
+frame_params.grid_columnconfigure(0, minsize=140)
+frame_params.grid_columnconfigure(1, weight=1)
 
-def add_labeled_scale(parent, label_text, var, frm, to, resolution=None, **kw):
-    row = ttk.Frame(parent)
-    row.pack(fill='x', pady=6)
-    row.columnconfigure(1, weight=1)
-    lbl = ttk.Label(row, text=label_text, width=15)
-    lbl.grid(row=0, column=0, sticky='w')
-    s = ttk.Scale(row, from_=frm, to=to, variable=var, command=update_params)
-    s.grid(row=0, column=1, sticky='ew', padx=6)
-    val_lbl = ttk.Label(row, textvariable=var, width=5, anchor='e')
-    val_lbl.grid(row=0, column=2, sticky='e')
+label_title_params = customtkinter.CTkLabel(frame_params, text="⚙️ พารามิเตอร์", font=("Roboto", 16, "bold"))
+label_title_params.grid(row=0, column=0, columnspan=3, pady=(10, 5), sticky="w", padx=10)
+
+def add_labeled_scale(parent, label_text, var, frm, to, row_idx):
+    lbl = customtkinter.CTkLabel(parent, text=label_text, anchor="w")
+    lbl.grid(row=row_idx, column=0, sticky='w', padx=(10, 5), pady=5)
+    
+    s = customtkinter.CTkSlider(parent, from_=frm, to=to, variable=var, command=update_params, button_color=ACCENT_RED, progress_color=PRIMARY_PURPLE)
+    s.grid(row=row_idx, column=1, sticky='ew', padx=5, pady=5)
+    
+    val_lbl = customtkinter.CTkLabel(parent, textvariable=var, width=30, anchor="e")
+    val_lbl.grid(row=row_idx, column=2, sticky='e', padx=(5, 10), pady=5)
     return lbl
 
-label_lock = add_labeled_scale(frame_params, 'แรงดูด (Lock)', strength_var, 0.5, 3.0)
-label_smooth = add_labeled_scale(frame_params, 'ความนิ่ง (Smooth)', stability_var, 0.05, 1.00)
-label_max_step = add_labeled_scale(frame_params, 'Max Step', max_step_var, 1, 20)
-label_deadzone = add_labeled_scale(frame_params, 'Deadzone', deadzone_var, 0, 15)
-label_fov = add_labeled_scale(frame_params, 'FOV Radius', fov_var, 30, 140)
+label_lock = add_labeled_scale(frame_params, 'แรงดูด (Lock)', strength_var, 0.5, 3.0, 1)
+label_smooth = add_labeled_scale(frame_params, 'ความนิ่ง (Smooth)', stability_var, 0.05, 1.00, 2)
+label_max_step = add_labeled_scale(frame_params, 'Max Step', max_step_var, 1, 20, 3)
+label_deadzone = add_labeled_scale(frame_params, 'Deadzone', deadzone_var, 0, 15, 4)
+label_fov = add_labeled_scale(frame_params, 'FOV Radius', fov_var, 30, 140, 5)
+label_offset_x = add_labeled_scale(frame_params, 'Offset X', offset_x_var, -100, 100, 6)
+label_offset_y = add_labeled_scale(frame_params, 'Offset Y', offset_y_var, -100, 100, 7)
 
 
-frame_controls = ttk.LabelFrame(right_col, text='🕹️ ควบคุม / สถานะ', padding=(10, 10))
-frame_controls.grid(row=1, column=0, sticky='sew', pady=6)
-frame_controls.columnconfigure(0, weight=1)
+# --- Left Column: Controls ---
+frame_controls = customtkinter.CTkFrame(left_col, fg_color=BG_LIGHT)
+frame_controls.grid(row=1, column=0, sticky='sew', padx=10, pady=10)
+frame_controls.grid_columnconfigure(0, weight=1)
 
-start_btn = ttk.Button(frame_controls, text='✅ เริ่มการทำงาน', command=on_start)
-start_btn.grid(row=0, column=0, sticky='ew', pady=(0, 6))
-stop_btn = ttk.Button(frame_controls, text='❌ หยุดการทำงาน', command=stop_worker)
-stop_btn.grid(row=1, column=0, sticky='ew', pady=(0, 10))
+label_title_controls = customtkinter.CTkLabel(frame_controls, text="�️ ควบคุม", font=("Roboto", 16, "bold"))
+label_title_controls.grid(row=0, column=0, pady=(10, 5), sticky="w", padx=10)
 
-show_fov_chk = ttk.Checkbutton(frame_controls, text='แสดง FOV Overlay', variable=show_fov_var, command=ensure_overlay)
-show_fov_chk.grid(row=2, column=0, sticky='w', pady=(0, 10))
+start_btn = customtkinter.CTkButton(frame_controls, text='✅ เริ่มการทำงาน', command=on_start, fg_color="#2CC985", hover_color="#229966", text_color="white")
+start_btn.grid(row=1, column=0, sticky='ew', pady=(5, 5), padx=10)
 
-frame_status = ttk.LabelFrame(frame_controls, text='สถานะ', padding=(10, 10))
-frame_status.grid(row=3, column=0, sticky='ew', pady=(0, 10))
-status_label = ttk.Label(frame_status, textvariable=status_var)
-status_label.pack(fill='x', expand=True, padx=5)
+stop_btn = customtkinter.CTkButton(frame_controls, text='❌ หยุดการทำงาน', command=stop_worker, fg_color="#C92C2C", hover_color="#992222", text_color="white")
+stop_btn.grid(row=2, column=0, sticky='ew', pady=(0, 10), padx=10)
 
-lang_btn = ttk.Button(frame_controls, text='ภาษา', command=toggle_language)
-lang_btn.grid(row=4, column=0, sticky='ew', pady=(0, 0))
+show_fov_chk = customtkinter.CTkCheckBox(frame_controls, text='แสดง FOV Overlay', variable=show_fov_var, command=ensure_overlay, fg_color=PRIMARY_PURPLE, hover_color=PRIMARY_PURPLE_HOVER)
+show_fov_chk.grid(row=3, column=0, sticky='w', pady=(0, 10), padx=10)
+
+frame_status = customtkinter.CTkFrame(frame_controls, fg_color="transparent", border_width=1, border_color=PRIMARY_PURPLE)
+frame_status.grid(row=4, column=0, sticky='ew', pady=(0, 10), padx=10)
+status_label = customtkinter.CTkLabel(frame_status, textvariable=status_var)
+status_label.pack(fill='x', expand=True, padx=5, pady=5)
+
+lang_btn = customtkinter.CTkButton(frame_controls, text='ภาษา', command=toggle_language, fg_color="transparent", border_width=1, border_color=PRIMARY_PURPLE, text_color=TEXT_LIGHT)
+lang_btn.grid(row=5, column=0, sticky='ew', pady=(0, 10), padx=10)
 
 
-apply_language() 
+# --- Right Column: Triggerbot / Hotkeys ---
+# Placing it below Parameters (frame_params is row 0)
+frame_trigger = customtkinter.CTkFrame(right_col, fg_color=BG_LIGHT)
+frame_trigger.grid(row=1, column=0, sticky='nsew', padx=10, pady=10)
+frame_trigger.grid_columnconfigure(0, minsize=140)
+frame_trigger.grid_columnconfigure(1, weight=1)
+
+label_title_trigger = customtkinter.CTkLabel(frame_trigger, text="� Triggerbot / Hotkeys", font=("Roboto", 16, "bold"))
+label_title_trigger.grid(row=0, column=0, columnspan=2, pady=(10, 5), sticky="w", padx=10)
+
+chk_trigger = customtkinter.CTkCheckBox(frame_trigger, text='Enable Triggerbot', variable=trigger_var, command=update_params, fg_color=PRIMARY_PURPLE, hover_color=PRIMARY_PURPLE_HOVER)
+chk_trigger.grid(row=1, column=0, columnspan=2, sticky='w', padx=10, pady=5)
+
+label_trigger_dist = add_labeled_scale(frame_trigger, 'Trigger Distance', trigger_dist_var, 1, 50, 3)
+
+# Hotkey Aim
+row_hk = customtkinter.CTkFrame(frame_trigger, fg_color="transparent")
+row_hk.grid(row=2, column=0, columnspan=3, sticky='w', padx=10, pady=5)
+
+label_hotkey_aim = customtkinter.CTkLabel(row_hk, text='Aim Key (Hex):')
+label_hotkey_aim.pack(side='left', padx=(0, 5))
+
+entry_hotkey_aim = customtkinter.CTkEntry(row_hk, textvariable=aim_key_var, width=80, fg_color=BG_MEDIUM, border_color=PRIMARY_PURPLE)
+entry_hotkey_aim.pack(side='left', padx=(0, 5))
+
+btn_update_hotkey = customtkinter.CTkButton(row_hk, text='Update', command=update_params, width=60, fg_color=PRIMARY_PURPLE, hover_color=PRIMARY_PURPLE_HOVER)
+btn_update_hotkey.pack(side='left')
+
+
+def load_settings():
+    try:
+        if not os.path.exists('settings.json'):
+            return
+        
+        # Check if file is empty
+        if os.path.getsize('settings.json') == 0:
+            return
+
+        with open('settings.json', 'r') as f:
+            try:
+                data = json.load(f)
+            except json.JSONDecodeError:
+                print("Settings file is corrupted. Using defaults.")
+                return
+            
+        hex_var.set(data.get("hex", "#feffb2"))
+        tol_h_var.set(data.get("tol_h", 10))
+        tol_s_var.set(data.get("tol_s", 60))
+        tol_v_var.set(data.get("tol_v", 60))
+        strength_var.set(data.get("lock_strength", 1.0))
+        stability_var.set(data.get("smooth_alpha", 0.18))
+        max_step_var.set(data.get("max_step", 6))
+        deadzone_var.set(data.get("deadzone", 6))
+        fov_var.set(data.get("fov", 80))
+        offset_x_var.set(data.get("offset_x", 0))
+        offset_y_var.set(data.get("offset_y", 0))
+        show_fov_var.set(data.get("show_fov", False))
+        lang_var.set(data.get("lang", "TH"))
+        trigger_var.set(data.get("trigger_enabled", False))
+        trigger_dist_var.set(data.get("trigger_distance", 5))
+        aim_key_var.set(data.get("aim_key", "0x77"))
+        
+        palette_list.delete(0, tk.END)
+        for c in data.get("palette", []):
+            palette_list.insert(tk.END, c)
+            
+        update_swatch(swatch_canvas, hex_var.get())
+        update_params()
+        
+    except Exception as e:
+        print(f"Error loading settings: {e}")
+
+def save_settings():
+    try:
+        data = {
+            "hex": hex_var.get(),
+            "tol_h": tol_h_var.get(),
+            "tol_s": tol_s_var.get(),
+            "tol_v": tol_v_var.get(),
+            "lock_strength": strength_var.get(),
+            "smooth_alpha": stability_var.get(),
+            "max_step": max_step_var.get(),
+            "deadzone": deadzone_var.get(),
+            "fov": fov_var.get(),
+            "offset_x": offset_x_var.get(),
+            "offset_y": offset_y_var.get(),
+            "show_fov": show_fov_var.get(),
+            "lang": lang_var.get(),
+            "trigger_enabled": trigger_var.get(),
+            "trigger_distance": trigger_dist_var.get(),
+            "aim_key": aim_key_var.get(),
+            "palette": list(palette_list.get(0, tk.END))
+        }
+        with open('settings.json', 'w') as f:
+            json.dump(data, f, indent=2)
+    except Exception as e:
+        print(f"Error saving settings: {e}")
+
+def on_close():
+    stop_worker()
+    save_settings()
+    root.destroy()
+
+load_settings()
+apply_language()
+root.protocol("WM_DELETE_WINDOW", on_close)
 root.mainloop()
