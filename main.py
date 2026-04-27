@@ -55,7 +55,8 @@ def get_hsv_range_from_image(path, tolerance=(10, 60, 60)):
     ], dtype=np.uint8)
     return lower, upper
 
-lower_hsv, upper_hsv = get_hsv_range_from_image("images/main.png", tolerance=(10, 60, 60))
+lower_hsv = np.array([0, 160, 160], dtype=np.uint8)
+upper_hsv = np.array([10, 255, 255], dtype=np.uint8)
 kernel = np.ones((3, 3), np.uint8)
 min_area = 60
 crosshairU = config.crosshairUniform
