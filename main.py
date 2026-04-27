@@ -98,6 +98,13 @@ lock_cx = None
 lock_cy = None
 overlay = None
 overlay_canvas = None
+value_labels = {}
+
+def round_to_2(value):
+    return round(float(value), 2)
+
+def format_value(value, digits=2):
+    return f"{round_to_2(value):.{digits}f}"
 
 def build_mask(frame_hsv):
     if not active_ranges:
@@ -194,8 +201,7 @@ def run_loop():
         time.sleep(0.001)
         GameFrame = np.array(s.grab(regionC))
         GameFrame = cv2.cvtColor(GameFrame, cv2.COLOR_BGRA2BGR)
-        
-        # Toggle Aim
+
         tk_state = win32api.GetAsyncKeyState(toggle_key)
         if tk_state < 0 and prev_toggle_state >= 0:
             aim_enabled = not aim_enabled
@@ -204,10 +210,6 @@ def run_loop():
             except Exception:
                 pass
         prev_toggle_state = tk_state
-        
-        # Trigger Toggle (Separate Key Check example, or UI Toggle)
-        # For now, let's keep trigger enabled via UI checkbox only to avoid key clutter, 
-        # or check a specific key if requested. Let's stick to UI variable for enable/disable logic first.
 
         if win32api.GetAsyncKeyState(0x6) < 0:
             try:
@@ -244,17 +246,15 @@ def run_loop():
                     cx, cy, area, _ = chosen
                     track_cx, track_cy = cx, cy
                     lock_cx, lock_cy = cx, cy
-                    
-                    # Triggerbot Logic
+                
                     if trigger_enabled and aim_enabled:
                          dist_sq = (crosshairU - cx)**2 + (crosshairU - cy)**2
                          if dist_sq <= trigger_distance**2:
                              win32api.mouse_event(win32con.MOUSEEVENTF_LEFTDOWN, 0, 0, 0, 0)
                              time.sleep(0.01)
                              win32api.mouse_event(win32con.MOUSEEVENTF_LEFTUP, 0, 0, 0, 0)
-                             time.sleep(0.05) # Delay between shots
-
-                    # Apply Offset
+                             time.sleep(0.05)
+                             
                     target_x = cx + offset_x
                     target_y = cy + offset_y
                     
@@ -383,10 +383,34 @@ def auto_detect_colors_from_folder():
             active_ranges.append(rng)
     update_swatch(swatch_canvas, cols[0])
 
+def refresh_value_labels():
+    if 'strength' in value_labels:
+        value_labels['strength'].set(format_value(strength_var.get()))
+    if 'stability' in value_labels:
+        value_labels['stability'].set(format_value(stability_var.get()))
+    if 'max_step' in value_labels:
+        value_labels['max_step'].set(str(int(max_step_var.get())))
+    if 'deadzone' in value_labels:
+        value_labels['deadzone'].set(str(int(deadzone_var.get())))
+    if 'fov' in value_labels:
+        value_labels['fov'].set(str(int(fov_var.get())))
+    if 'offset_x' in value_labels:
+        value_labels['offset_x'].set(str(int(offset_x_var.get())))
+    if 'offset_y' in value_labels:
+        value_labels['offset_y'].set(str(int(offset_y_var.get())))
+    if 'trigger_distance' in value_labels:
+        value_labels['trigger_distance'].set(str(int(trigger_dist_var.get())))
+
 def update_params(*args):
     global lock_strength, smooth_alpha, max_step_px, deadzone_px, fov_radius, offset_x, offset_y
-    lock_strength = float(strength_var.get())
-    smooth_alpha = float(stability_var.get())
+    rounded_strength = round_to_2(strength_var.get())
+    rounded_stability = round_to_2(stability_var.get())
+    if abs(float(strength_var.get()) - rounded_strength) > 1e-9:
+        strength_var.set(rounded_strength)
+    if abs(float(stability_var.get()) - rounded_stability) > 1e-9:
+        stability_var.set(rounded_stability)
+    lock_strength = rounded_strength
+    smooth_alpha = max(0.01, 1.0 - rounded_stability)
     max_step_px = int(max_step_var.get())
     deadzone_px = int(deadzone_var.get())
     fov_radius = int(fov_var.get())
@@ -399,7 +423,13 @@ def update_params(*args):
         toggle_key = int(aim_key_var.get(), 16)
     except:
         pass
+    refresh_value_labels()
     update_overlay()
+
+def startup_image_scan():
+    auto_detect_colors_from_folder()
+    if not active_ranges:
+        set_from_hex()
 
 def ensure_overlay():
     global overlay, overlay_canvas
@@ -455,9 +485,9 @@ LANG_TEXT = {
         'frame_params': 'พารามิเตอร์การทำงาน',
         'lock': 'แรงดูด (Lock)',
         'smooth': 'ความนิ่ง (Smooth)',
-        'max_step': 'Max Step',
-        'deadzone': 'Deadzone',
-        'fov': 'FOV Radius',
+        'max_step': 'Aim Speed',
+        'deadzone': 'Aim Deadzone',
+        'fov': 'FOV',
         'offset_x': 'Offset X',
         'offset_y': 'Offset Y',
         'frame_trigger': 'Triggerbot / Hotkeys',
@@ -482,9 +512,9 @@ LANG_TEXT = {
         'frame_params': 'Operation Parameters',
         'lock': 'Lock Strength',
         'smooth': 'Smoothness',
-        'max_step': 'Max Step',
-        'deadzone': 'Deadzone',
-        'fov': 'FOV Radius',
+        'max_step': 'Aim Speed',
+        'deadzone': 'Aim Deadzone',
+        'fov': 'FOV',
         'offset_x': 'Offset X',
         'offset_y': 'Offset Y',
         'frame_trigger': 'Triggerbot / Hotkeys',
@@ -572,6 +602,14 @@ aim_key_var = customtkinter.StringVar(value="0x77")
 show_fov_var = customtkinter.BooleanVar(value=False)
 status_var = customtkinter.StringVar(value='Stopped')
 lang_var = customtkinter.StringVar(value='TH')
+strength_display_var = customtkinter.StringVar(value=format_value(strength_var.get()))
+stability_display_var = customtkinter.StringVar(value=format_value(stability_var.get()))
+max_step_display_var = customtkinter.StringVar(value=str(int(max_step_var.get())))
+deadzone_display_var = customtkinter.StringVar(value=str(int(deadzone_var.get())))
+fov_display_var = customtkinter.StringVar(value=str(int(fov_var.get())))
+offset_x_display_var = customtkinter.StringVar(value=str(int(offset_x_var.get())))
+offset_y_display_var = customtkinter.StringVar(value=str(int(offset_y_var.get())))
+trigger_dist_display_var = customtkinter.StringVar(value=str(int(trigger_dist_var.get())))
 
 root.grid_columnconfigure(0, weight=1)
 root.grid_columnconfigure(1, weight=1)
@@ -585,7 +623,6 @@ right_col = customtkinter.CTkFrame(root, fg_color=BG_MEDIUM)
 right_col.grid(row=0, column=1, sticky='nsew', padx=10, pady=10)
 right_col.grid_columnconfigure(0, weight=1)
 
-# --- Left Column: Color Settings ---
 frame_color = customtkinter.CTkFrame(left_col, fg_color=BG_LIGHT)
 frame_color.grid(row=0, column=0, sticky='nsew', padx=10, pady=10)
 frame_color.grid_columnconfigure(0, weight=1)
@@ -635,8 +672,6 @@ analyze_images_btn.grid(row=0, column=1, sticky='ew', padx=(5, 0), pady=(0, 5))
 lock_colors_btn = customtkinter.CTkButton(btns_palette, text='ล็อคสี', command=lock_selected_colors, fg_color=PRIMARY_PURPLE, hover_color=PRIMARY_PURPLE_HOVER)
 lock_colors_btn.grid(row=1, column=0, columnspan=2, sticky='ew', padx=0, pady=0)
 
-
-# --- Right Column: Parameters ---
 frame_params = customtkinter.CTkFrame(right_col, fg_color=BG_LIGHT)
 frame_params.grid(row=0, column=0, sticky='new', padx=10, pady=10)
 frame_params.grid_columnconfigure(0, minsize=140)
@@ -645,27 +680,27 @@ frame_params.grid_columnconfigure(1, weight=1)
 label_title_params = customtkinter.CTkLabel(frame_params, text="⚙️ พารามิเตอร์", font=("Roboto", 16, "bold"))
 label_title_params.grid(row=0, column=0, columnspan=3, pady=(10, 5), sticky="w", padx=10)
 
-def add_labeled_scale(parent, label_text, var, frm, to, row_idx):
+def add_labeled_scale(parent, label_text, var, frm, to, row_idx, value_key=None, display_var=None):
     lbl = customtkinter.CTkLabel(parent, text=label_text, anchor="w")
     lbl.grid(row=row_idx, column=0, sticky='w', padx=(10, 5), pady=5)
     
     s = customtkinter.CTkSlider(parent, from_=frm, to=to, variable=var, command=update_params, button_color=ACCENT_RED, progress_color=PRIMARY_PURPLE)
     s.grid(row=row_idx, column=1, sticky='ew', padx=5, pady=5)
     
-    val_lbl = customtkinter.CTkLabel(parent, textvariable=var, width=30, anchor="e")
+    val_lbl = customtkinter.CTkLabel(parent, textvariable=display_var or var, width=40, anchor="e")
     val_lbl.grid(row=row_idx, column=2, sticky='e', padx=(5, 10), pady=5)
+    if value_key and display_var is not None:
+        value_labels[value_key] = display_var
     return lbl
 
-label_lock = add_labeled_scale(frame_params, 'แรงดูด (Lock)', strength_var, 0.5, 3.0, 1)
-label_smooth = add_labeled_scale(frame_params, 'ความนิ่ง (Smooth)', stability_var, 0.05, 1.00, 2)
-label_max_step = add_labeled_scale(frame_params, 'Max Step', max_step_var, 1, 20, 3)
-label_deadzone = add_labeled_scale(frame_params, 'Deadzone', deadzone_var, 0, 15, 4)
-label_fov = add_labeled_scale(frame_params, 'FOV Radius', fov_var, 30, 140, 5)
-label_offset_x = add_labeled_scale(frame_params, 'Offset X', offset_x_var, -100, 100, 6)
-label_offset_y = add_labeled_scale(frame_params, 'Offset Y', offset_y_var, -100, 100, 7)
+label_lock = add_labeled_scale(frame_params, '?????????????????? (Lock)', strength_var, 0.5, 3.0, 1, value_key='strength', display_var=strength_display_var)
+label_smooth = add_labeled_scale(frame_params, '???????????????????????? (Smooth)', stability_var, 0.05, 1.00, 2, value_key='stability', display_var=stability_display_var)
+label_max_step = add_labeled_scale(frame_params, 'Aim Speed', max_step_var, 1, 20, 3, value_key='max_step', display_var=max_step_display_var)
+label_deadzone = add_labeled_scale(frame_params, 'Aim Deadzone', deadzone_var, 0, 15, 4, value_key='deadzone', display_var=deadzone_display_var)
+label_fov = add_labeled_scale(frame_params, 'FOV', fov_var, 30, 140, 5, value_key='fov', display_var=fov_display_var)
+label_offset_x = add_labeled_scale(frame_params, 'Offset X', offset_x_var, -100, 100, 6, value_key='offset_x', display_var=offset_x_display_var)
+label_offset_y = add_labeled_scale(frame_params, 'Offset Y', offset_y_var, -100, 100, 7, value_key='offset_y', display_var=offset_y_display_var)
 
-
-# --- Left Column: Controls ---
 frame_controls = customtkinter.CTkFrame(left_col, fg_color=BG_LIGHT)
 frame_controls.grid(row=1, column=0, sticky='sew', padx=10, pady=10)
 frame_controls.grid_columnconfigure(0, weight=1)
@@ -690,9 +725,6 @@ status_label.pack(fill='x', expand=True, padx=5, pady=5)
 lang_btn = customtkinter.CTkButton(frame_controls, text='ภาษา', command=toggle_language, fg_color="transparent", border_width=1, border_color=PRIMARY_PURPLE, text_color=TEXT_LIGHT)
 lang_btn.grid(row=5, column=0, sticky='ew', pady=(0, 10), padx=10)
 
-
-# --- Right Column: Triggerbot / Hotkeys ---
-# Placing it below Parameters (frame_params is row 0)
 frame_trigger = customtkinter.CTkFrame(right_col, fg_color=BG_LIGHT)
 frame_trigger.grid(row=1, column=0, sticky='nsew', padx=10, pady=10)
 frame_trigger.grid_columnconfigure(0, minsize=140)
@@ -704,9 +736,8 @@ label_title_trigger.grid(row=0, column=0, columnspan=2, pady=(10, 5), sticky="w"
 chk_trigger = customtkinter.CTkCheckBox(frame_trigger, text='Enable Triggerbot', variable=trigger_var, command=update_params, fg_color=PRIMARY_PURPLE, hover_color=PRIMARY_PURPLE_HOVER)
 chk_trigger.grid(row=1, column=0, columnspan=2, sticky='w', padx=10, pady=5)
 
-label_trigger_dist = add_labeled_scale(frame_trigger, 'Trigger Distance', trigger_dist_var, 1, 50, 3)
+label_trigger_dist = add_labeled_scale(frame_trigger, 'Trigger Distance', trigger_dist_var, 1, 50, 3, value_key='trigger_distance', display_var=trigger_dist_display_var)
 
-# Hotkey Aim
 row_hk = customtkinter.CTkFrame(frame_trigger, fg_color="transparent")
 row_hk.grid(row=2, column=0, columnspan=3, sticky='w', padx=10, pady=5)
 
@@ -725,7 +756,6 @@ def load_settings():
         if not os.path.exists('settings.json'):
             return
         
-        # Check if file is empty
         if os.path.getsize('settings.json') == 0:
             return
 
@@ -740,8 +770,8 @@ def load_settings():
         tol_h_var.set(data.get("tol_h", 10))
         tol_s_var.set(data.get("tol_s", 60))
         tol_v_var.set(data.get("tol_v", 60))
-        strength_var.set(data.get("lock_strength", 1.0))
-        stability_var.set(data.get("smooth_alpha", 0.18))
+        strength_var.set(round_to_2(data.get("lock_strength", 1.0)))
+        stability_var.set(round_to_2(data.get("smooth_alpha", 0.18)))
         max_step_var.set(data.get("max_step", 6))
         deadzone_var.set(data.get("deadzone", 6))
         fov_var.set(data.get("fov", 80))
@@ -770,8 +800,8 @@ def save_settings():
             "tol_h": tol_h_var.get(),
             "tol_s": tol_s_var.get(),
             "tol_v": tol_v_var.get(),
-            "lock_strength": strength_var.get(),
-            "smooth_alpha": stability_var.get(),
+            "lock_strength": round_to_2(strength_var.get()),
+            "smooth_alpha": round_to_2(stability_var.get()),
             "max_step": max_step_var.get(),
             "deadzone": deadzone_var.get(),
             "fov": fov_var.get(),
@@ -796,5 +826,7 @@ def on_close():
 
 load_settings()
 apply_language()
+refresh_value_labels()
+root.after(150, startup_image_scan)
 root.protocol("WM_DELETE_WINDOW", on_close)
 root.mainloop()
