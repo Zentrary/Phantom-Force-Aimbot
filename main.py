@@ -9,9 +9,11 @@ import cv2
 import mss
 import threading
 import tkinter as tk
-from tkinter import filedialog, ttk
 import os
 import json
+import customtkinter
+
+from tkinter import filedialog, ttk
 
 class Config:
     def __init__(self):
@@ -63,10 +65,10 @@ crosshairU = config.crosshairUniform
 regionC = config.region
 robloxSensitivity = 0.55
 PF_MouseSensitivity = 0.5
-PF_AimSensitivity = 1
-PF_sensitivity = PF_MouseSensitivity*PF_AimSensitivity
+PF_AimSensitivity = 1.0
 movementCompensation = 0.0
-finalComputerSensitivityMultiplier = ((robloxSensitivity*PF_sensitivity)/0.55) + movementCompensation
+PF_sensitivity = PF_MouseSensitivity * PF_AimSensitivity
+finalComputerSensitivityMultiplier = ((robloxSensitivity * PF_sensitivity) / 0.55) + movementCompensation
 deadzone_px = 6
 max_step_px = 6
 smooth_alpha = 0.18
@@ -88,10 +90,7 @@ fov_radius = 80
 lock_strength = 1.0
 offset_x = 0
 offset_y = 0
-trigger_enabled = False
-trigger_distance = 5
 toggle_key = 0x77  # Default F8 (VK_F8)
-trigger_key = 0x79 # Default F10
 active_ranges = []
 running = False
 worker = None
@@ -195,7 +194,7 @@ def analyze_folder_colors(folder, k=8, max_images=50, sample_per_image=4000):
     return res
 
 def run_loop():
-    global running, track_cx, track_cy, prev_toggle_state, ema_dx, ema_dy, prev_err_x, prev_err_y, lock_cx, lock_cy, aim_enabled, trigger_enabled
+    global running, track_cx, track_cy, prev_toggle_state, ema_dx, ema_dy, prev_err_x, prev_err_y, lock_cx, lock_cy, aim_enabled
     running = True
     s = mss.mss()
     while running:
@@ -247,15 +246,6 @@ def run_loop():
                     cx, cy, area, _ = chosen
                     track_cx, track_cy = cx, cy
                     lock_cx, lock_cy = cx, cy
-                
-                    if trigger_enabled and aim_enabled:
-                         dist_sq = (crosshairU - cx)**2 + (crosshairU - cy)**2
-                         if dist_sq <= trigger_distance**2:
-                             win32api.mouse_event(win32con.MOUSEEVENTF_LEFTDOWN, 0, 0, 0, 0)
-                             time.sleep(0.01)
-                             win32api.mouse_event(win32con.MOUSEEVENTF_LEFTUP, 0, 0, 0, 0)
-                             time.sleep(0.05)
-                             
                     target_x = cx + offset_x
                     target_y = cy + offset_y
                     
@@ -399,11 +389,15 @@ def refresh_value_labels():
         value_labels['offset_x'].set(str(int(offset_x_var.get())))
     if 'offset_y' in value_labels:
         value_labels['offset_y'].set(str(int(offset_y_var.get())))
-    if 'trigger_distance' in value_labels:
-        value_labels['trigger_distance'].set(str(int(trigger_dist_var.get())))
+    if 'pf_mouse' in value_labels:
+        value_labels['pf_mouse'].set(format_value(pf_mouse_var.get()))
+    if 'pf_aim' in value_labels:
+        value_labels['pf_aim'].set(format_value(pf_aim_var.get()))
+    if 'roblox_sens' in value_labels:
+        value_labels['roblox_sens'].set(format_value(roblox_sens_var.get()))
 
 def update_params(*args):
-    global lock_strength, smooth_alpha, max_step_px, deadzone_px, fov_radius, offset_x, offset_y
+    global lock_strength, smooth_alpha, max_step_px, deadzone_px, fov_radius, offset_x, offset_y, robloxSensitivity, PF_MouseSensitivity, PF_AimSensitivity, PF_sensitivity, finalComputerSensitivityMultiplier
     rounded_strength = round_to_2(strength_var.get())
     rounded_stability = round_to_2(stability_var.get())
     if abs(float(strength_var.get()) - rounded_strength) > 1e-9:
@@ -417,13 +411,11 @@ def update_params(*args):
     fov_radius = int(fov_var.get())
     offset_x = int(offset_x_var.get())
     offset_y = int(offset_y_var.get())
-    global trigger_enabled, trigger_distance, toggle_key
-    trigger_enabled = trigger_var.get()
-    trigger_distance = int(trigger_dist_var.get())
-    try:
-        toggle_key = int(aim_key_var.get(), 16)
-    except:
-        pass
+    robloxSensitivity = roblox_sens_var.get()
+    PF_MouseSensitivity = pf_mouse_var.get()
+    PF_AimSensitivity = pf_aim_var.get()
+    PF_sensitivity = PF_MouseSensitivity * PF_AimSensitivity
+    finalComputerSensitivityMultiplier = ((robloxSensitivity * PF_sensitivity) / 0.55) + movementCompensation
     refresh_value_labels()
     update_overlay()
 
@@ -477,13 +469,13 @@ def hide_overlay():
 
 LANG_TEXT = {
     'TH': {
-        'frame_color': 'การตั้งค่าสี / พาเลต',
+        'frame_color': 'เลือกสีที่จะล็อค',
         'hex': 'รหัสสี:',
         'apply_hex': 'ใช้สี',
         'choose_image': 'เลือกรูปภาพ',
         'analyze_images': 'วิเคราะห์ images',
         'lock_colors': 'ล็อคสีที่เลือก',
-        'frame_params': 'พารามิเตอร์การทำงาน',
+        'frame_params': 'การตั้งค่า',
         'lock': 'แรงดูด (Lock)',
         'smooth': 'ความนิ่ง (Smooth)',
         'max_step': 'Aim Speed',
@@ -491,11 +483,11 @@ LANG_TEXT = {
         'fov': 'FOV',
         'offset_x': 'Offset X',
         'offset_y': 'Offset Y',
-        'frame_trigger': 'Triggerbot / Hotkeys',
-        'trigger_enable': 'เปิดใช้งาน Triggerbot',
-        'trigger_dist': 'ระยะทำงาน (px)',
+        'frame_hotkeys': 'คีย์ลัด',
+        'pf_mouse': 'ความไวของเมาส์ในเกม',
+        'pf_aim': 'ความเร็วในการเล็กในเกม',
+        'roblox_sens': 'ความไวของเมาส์ของ roblox',
         'hotkey_aim': 'ปุ่ม Aim (Hex):',
-        'hotkey_trigger': 'ปุ่ม Trigger (Hex):',
         'frame_controls': 'ควบคุม / สถานะ',
         'start': 'เริ่มการทำงาน',
         'stop': 'หยุดการทำงาน',
@@ -504,13 +496,13 @@ LANG_TEXT = {
         'lang_button': 'ภาษา: ไทย'
     },
     'EN': {
-        'frame_color': 'Color / Palette Settings',
+        'frame_color': 'Lock Color Selection',
         'hex': 'Hex:',
         'apply_hex': 'Apply Hex',
         'choose_image': 'Pick Image',
         'analyze_images': 'Analyze images',
         'lock_colors': 'Lock Selected Colors',
-        'frame_params': 'Operation Parameters',
+        'frame_params': 'Settings',
         'lock': 'Lock Strength',
         'smooth': 'Smoothness',
         'max_step': 'Aim Speed',
@@ -518,11 +510,11 @@ LANG_TEXT = {
         'fov': 'FOV',
         'offset_x': 'Offset X',
         'offset_y': 'Offset Y',
-        'frame_trigger': 'Triggerbot / Hotkeys',
-        'trigger_enable': 'Enable Triggerbot',
-        'trigger_dist': 'Trigger Distance',
+        'frame_hotkeys': 'Hotkeys',
+        'pf_mouse': 'In-game mouse sensitivity',
+        'pf_aim': 'In-game aim sensitivity',
+        'roblox_sens': 'Roblox sensitivity',
         'hotkey_aim': 'Aim Key (Hex)',
-        'hotkey_trigger': 'Trigger Key (Hex)',
         'frame_controls': 'Controls / Status',
         'start': 'Start',
         'stop': 'Stop',
@@ -544,16 +536,14 @@ def apply_language():
     label_title_params.configure(text=t['frame_params'])
     label_lock.configure(text=t['lock'])
     label_smooth.configure(text=t['smooth'])
+    label_pf_mouse.configure(text=t['pf_mouse'])
+    label_pf_aim.configure(text=t['pf_aim'])
+    label_roblox.configure(text=t['roblox_sens'])
     label_max_step.configure(text=t['max_step'])
     label_deadzone.configure(text=t['deadzone'])
     label_fov.configure(text=t['fov'])
     label_offset_x.configure(text=t['offset_x'])
     label_offset_y.configure(text=t['offset_y'])
-    
-    label_title_trigger.configure(text=t['frame_trigger'])
-    chk_trigger.configure(text=t['trigger_enable'])
-    label_trigger_dist.configure(text=t['trigger_dist'])
-    label_hotkey_aim.configure(text=t['hotkey_aim'])
     
     label_title_controls.configure(text=t['frame_controls'])
     start_btn.configure(text=t['start'])
@@ -565,9 +555,6 @@ def toggle_language():
     lang_var.set('EN' if lang_var.get() == 'TH' else 'TH')
     apply_language()
 
-import customtkinter
-
-# Color Theme - Grey/Black
 BG_DARK = "#121212"
 BG_MEDIUM = "#1E1E1E"
 BG_LIGHT = "#252525"
@@ -581,7 +568,7 @@ customtkinter.set_appearance_mode("Dark")
 customtkinter.set_default_color_theme("dark-blue")
 
 root = customtkinter.CTk()
-root.title("Color Aimbot")
+root.title("Aimbot Color")
 root.geometry('700x605')
 root.resizable(False, False)
 root.configure(fg_color=BG_DARK)
@@ -592,25 +579,27 @@ tol_s_var = customtkinter.IntVar(value=60)
 tol_v_var = customtkinter.IntVar(value=60)
 strength_var = customtkinter.DoubleVar(value=1.0)
 stability_var = customtkinter.DoubleVar(value=smooth_alpha)
+pf_mouse_var = customtkinter.DoubleVar(value=PF_MouseSensitivity)
+pf_aim_var = customtkinter.DoubleVar(value=PF_AimSensitivity)
+roblox_sens_var = customtkinter.DoubleVar(value=robloxSensitivity)
 max_step_var = customtkinter.IntVar(value=max_step_px)
 deadzone_var = customtkinter.IntVar(value=deadzone_px)
 fov_var = customtkinter.IntVar(value=fov_radius)
 offset_x_var = customtkinter.IntVar(value=0)
 offset_y_var = customtkinter.IntVar(value=0)
-trigger_var = customtkinter.BooleanVar(value=False)
-trigger_dist_var = customtkinter.IntVar(value=5)
-aim_key_var = customtkinter.StringVar(value="0x77")
 show_fov_var = customtkinter.BooleanVar(value=False)
 status_var = customtkinter.StringVar(value='Stopped')
 lang_var = customtkinter.StringVar(value='TH')
 strength_display_var = customtkinter.StringVar(value=format_value(strength_var.get()))
 stability_display_var = customtkinter.StringVar(value=format_value(stability_var.get()))
+pf_mouse_display_var = customtkinter.StringVar(value=format_value(pf_mouse_var.get()))
+pf_aim_display_var = customtkinter.StringVar(value=format_value(pf_aim_var.get()))
+roblox_display_var = customtkinter.StringVar(value=format_value(roblox_sens_var.get()))
 max_step_display_var = customtkinter.StringVar(value=str(int(max_step_var.get())))
 deadzone_display_var = customtkinter.StringVar(value=str(int(deadzone_var.get())))
 fov_display_var = customtkinter.StringVar(value=str(int(fov_var.get())))
 offset_x_display_var = customtkinter.StringVar(value=str(int(offset_x_var.get())))
 offset_y_display_var = customtkinter.StringVar(value=str(int(offset_y_var.get())))
-trigger_dist_display_var = customtkinter.StringVar(value=str(int(trigger_dist_var.get())))
 
 root.grid_columnconfigure(0, weight=1)
 root.grid_columnconfigure(1, weight=1)
@@ -696,11 +685,14 @@ def add_labeled_scale(parent, label_text, var, frm, to, row_idx, value_key=None,
 
 label_lock = add_labeled_scale(frame_params, '?????????????????? (Lock)', strength_var, 0.5, 3.0, 1, value_key='strength', display_var=strength_display_var)
 label_smooth = add_labeled_scale(frame_params, '???????????????????????? (Smooth)', stability_var, 0.05, 1.00, 2, value_key='stability', display_var=stability_display_var)
-label_max_step = add_labeled_scale(frame_params, 'Aim Speed', max_step_var, 1, 20, 3, value_key='max_step', display_var=max_step_display_var)
-label_deadzone = add_labeled_scale(frame_params, 'Aim Deadzone', deadzone_var, 0, 15, 4, value_key='deadzone', display_var=deadzone_display_var)
-label_fov = add_labeled_scale(frame_params, 'FOV', fov_var, 30, 140, 5, value_key='fov', display_var=fov_display_var)
-label_offset_x = add_labeled_scale(frame_params, 'Offset X', offset_x_var, -100, 100, 6, value_key='offset_x', display_var=offset_x_display_var)
-label_offset_y = add_labeled_scale(frame_params, 'Offset Y', offset_y_var, -100, 100, 7, value_key='offset_y', display_var=offset_y_display_var)
+label_pf_mouse = add_labeled_scale(frame_params, 'ความไวของเมาส์ในเกม', pf_mouse_var, 0.1, 5.0, 3, value_key='pf_mouse', display_var=pf_mouse_display_var)
+label_pf_aim = add_labeled_scale(frame_params, 'ความเร็วในการเล็กในเกม', pf_aim_var, 0.1, 3.0, 4, value_key='pf_aim', display_var=pf_aim_display_var)
+label_roblox = add_labeled_scale(frame_params, 'ความไวของเมาส์ของ roblox', roblox_sens_var, 0.1, 2.0, 5, value_key='roblox_sens', display_var=roblox_display_var)
+label_max_step = add_labeled_scale(frame_params, 'Aim Speed', max_step_var, 1, 20, 6, value_key='max_step', display_var=max_step_display_var)
+label_deadzone = add_labeled_scale(frame_params, 'Aim Deadzone', deadzone_var, 0, 15, 7, value_key='deadzone', display_var=deadzone_display_var)
+label_fov = add_labeled_scale(frame_params, 'FOV', fov_var, 30, 140, 8, value_key='fov', display_var=fov_display_var)
+label_offset_x = add_labeled_scale(frame_params, 'Offset X', offset_x_var, -100, 100, 9, value_key='offset_x', display_var=offset_x_display_var)
+label_offset_y = add_labeled_scale(frame_params, 'Offset Y', offset_y_var, -100, 100, 10, value_key='offset_y', display_var=offset_y_display_var)
 
 frame_controls = customtkinter.CTkFrame(left_col, fg_color=BG_LIGHT)
 frame_controls.grid(row=1, column=0, sticky='sew', padx=10, pady=10)
@@ -726,30 +718,6 @@ status_label.pack(fill='x', expand=True, padx=5, pady=5)
 lang_btn = customtkinter.CTkButton(frame_controls, text='ภาษา', command=toggle_language, fg_color="transparent", border_width=1, border_color=PRIMARY_PURPLE, text_color=TEXT_LIGHT)
 lang_btn.grid(row=5, column=0, sticky='ew', pady=(0, 10), padx=10)
 
-frame_trigger = customtkinter.CTkFrame(right_col, fg_color=BG_LIGHT)
-frame_trigger.grid(row=1, column=0, sticky='nsew', padx=10, pady=10)
-frame_trigger.grid_columnconfigure(0, minsize=140)
-frame_trigger.grid_columnconfigure(1, weight=1)
-
-label_title_trigger = customtkinter.CTkLabel(frame_trigger, text="� Triggerbot / Hotkeys", font=("Roboto", 16, "bold"))
-label_title_trigger.grid(row=0, column=0, columnspan=2, pady=(10, 5), sticky="w", padx=10)
-
-chk_trigger = customtkinter.CTkCheckBox(frame_trigger, text='Enable Triggerbot', variable=trigger_var, command=update_params, fg_color=PRIMARY_PURPLE, hover_color=PRIMARY_PURPLE_HOVER)
-chk_trigger.grid(row=1, column=0, columnspan=2, sticky='w', padx=10, pady=5)
-
-label_trigger_dist = add_labeled_scale(frame_trigger, 'Trigger Distance', trigger_dist_var, 1, 50, 3, value_key='trigger_distance', display_var=trigger_dist_display_var)
-
-row_hk = customtkinter.CTkFrame(frame_trigger, fg_color="transparent")
-row_hk.grid(row=2, column=0, columnspan=3, sticky='w', padx=10, pady=5)
-
-label_hotkey_aim = customtkinter.CTkLabel(row_hk, text='Aim Key (Hex):')
-label_hotkey_aim.pack(side='left', padx=(0, 5))
-
-entry_hotkey_aim = customtkinter.CTkEntry(row_hk, textvariable=aim_key_var, width=80, fg_color=BG_MEDIUM, border_color=PRIMARY_PURPLE)
-entry_hotkey_aim.pack(side='left', padx=(0, 5))
-
-btn_update_hotkey = customtkinter.CTkButton(row_hk, text='Update', command=update_params, width=60, fg_color=PRIMARY_PURPLE, hover_color=PRIMARY_PURPLE_HOVER)
-btn_update_hotkey.pack(side='left')
 
 
 def load_settings():
@@ -778,11 +746,11 @@ def load_settings():
         fov_var.set(data.get("fov", 80))
         offset_x_var.set(data.get("offset_x", 0))
         offset_y_var.set(data.get("offset_y", 0))
+        pf_mouse_var.set(data.get("pf_mouse_sensitivity", 0.5))
+        pf_aim_var.set(data.get("pf_aim_sensitivity", 1.0))
+        roblox_sens_var.set(data.get("roblox_sensitivity", 0.55))
         show_fov_var.set(data.get("show_fov", False))
         lang_var.set(data.get("lang", "TH"))
-        trigger_var.set(data.get("trigger_enabled", False))
-        trigger_dist_var.set(data.get("trigger_distance", 5))
-        aim_key_var.set(data.get("aim_key", "0x77"))
         
         palette_list.delete(0, tk.END)
         for c in data.get("palette", []):
@@ -803,6 +771,9 @@ def save_settings():
             "tol_v": tol_v_var.get(),
             "lock_strength": round_to_2(strength_var.get()),
             "smooth_alpha": round_to_2(stability_var.get()),
+            "pf_mouse_sensitivity": pf_mouse_var.get(),
+            "pf_aim_sensitivity": pf_aim_var.get(),
+            "roblox_sensitivity": roblox_sens_var.get(),
             "max_step": max_step_var.get(),
             "deadzone": deadzone_var.get(),
             "fov": fov_var.get(),
@@ -810,9 +781,6 @@ def save_settings():
             "offset_y": offset_y_var.get(),
             "show_fov": show_fov_var.get(),
             "lang": lang_var.get(),
-            "trigger_enabled": trigger_var.get(),
-            "trigger_distance": trigger_dist_var.get(),
-            "aim_key": aim_key_var.get(),
             "palette": list(palette_list.get(0, tk.END))
         }
         with open('settings.json', 'w') as f:
