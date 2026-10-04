@@ -3,7 +3,6 @@ import win32api
 import win32con
 import win32gui
 import numpy as np
-import random
 import time
 import cv2
 import mss
@@ -11,2031 +10,2450 @@ import threading
 import tkinter as tk
 import os
 import json
+import colorsys
 import customtkinter
+import ctypes
+from ctypes import wintypes
 
-from tkinter import filedialog, simpledialog, messagebox
+from tkinter import filedialog, messagebox
+from pynput import keyboard as pkeyboard, mouse as pmouse
 
+sigma_user32 = ctypes.windll.user32
 
-class Config:
+SKIBIDY_GWL_EXSTYLE = -20
+SKIBIDY_WS_EX_LAYERED = 0x80000
+SKIBIDY_WS_EX_TRANSPARENT = 0x20
+SKIBIDY_WS_EX_TOOLWINDOW = 0x80
+SKIBIDY_SWP_NOMOVE = 0x0002
+SKIBIDY_SWP_NOSIZE = 0x0001
+SKIBIDY_SWP_FRAMECHANGED = 0x0020
+SKIBIDY_HWND_TOPMOST = -1
+
+sigma_user32.GetParent.argtypes = [wintypes.HWND]
+sigma_user32.GetParent.restype = wintypes.HWND
+sigma_user32.GetWindowLongW.argtypes = [wintypes.HWND, ctypes.c_int]
+sigma_user32.GetWindowLongW.restype = ctypes.c_long
+sigma_user32.SetWindowLongW.argtypes = [wintypes.HWND, ctypes.c_int, ctypes.c_long]
+sigma_user32.SetWindowLongW.restype = ctypes.c_long
+sigma_user32.SetWindowPos.argtypes = [wintypes.HWND, wintypes.HWND, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_uint]
+sigma_user32.SetWindowPos.restype = wintypes.BOOL
+sigma_user32.SetWindowDisplayAffinity.argtypes = [wintypes.HWND, wintypes.DWORD]
+sigma_user32.SetWindowDisplayAffinity.restype = wintypes.BOOL
+
+RIZZ_WDA_NONE = 0x00000000
+RIZZ_WDA_EXCLUDEFROMCAPTURE = 0x00000011
+
+def rizz_exclude_from_capture_67(widget, enable=True):
+    try:
+        hwnd = widget.winfo_id()
+        parent = sigma_user32.GetParent(hwnd)
+        if parent:
+            hwnd = parent
+        affinity = RIZZ_WDA_EXCLUDEFROMCAPTURE if enable else RIZZ_WDA_NONE
+        return bool(sigma_user32.SetWindowDisplayAffinity(hwnd, affinity))
+    except Exception:
+        return False
+
+def skibidy_set_titlebar_color_67(hwnd, hex_color):
+    try:
+        r = int(hex_color[1:3], 16)
+        g = int(hex_color[3:5], 16)
+        b = int(hex_color[5:7], 16)
+        colorref = r | (g << 8) | (b << 16)
+        val = ctypes.c_int(colorref)
+        DWMWA_CAPTION_COLOR = 35
+        ctypes.windll.dwmapi.DwmSetWindowAttribute(
+            hwnd, DWMWA_CAPTION_COLOR, ctypes.byref(val), ctypes.sizeof(val))
+    except Exception:
+        pass
+
+def sigma_make_click_through_67(win, transparent_supported):
+    try:
+        hwnd = win.winfo_id()
+        parent = sigma_user32.GetParent(hwnd)
+        if parent:
+            hwnd = parent
+        style = sigma_user32.GetWindowLongW(hwnd, SKIBIDY_GWL_EXSTYLE)
+        style |= SKIBIDY_WS_EX_TRANSPARENT | SKIBIDY_WS_EX_TOOLWINDOW
+        if transparent_supported:
+            style |= SKIBIDY_WS_EX_LAYERED
+        sigma_user32.SetWindowLongW(hwnd, SKIBIDY_GWL_EXSTYLE, style)
+        sigma_user32.SetWindowPos(hwnd, wintypes.HWND(SKIBIDY_HWND_TOPMOST), 0, 0, 0, 0,
+                                  SKIBIDY_SWP_NOMOVE | SKIBIDY_SWP_NOSIZE | SKIBIDY_SWP_FRAMECHANGED)
+    except Exception:
+        pass
+
+def rizz_beep_sigma_on_67():
+    try:
+        winsound.Beep(1000, 55)
+        winsound.Beep(1500, 70)
+    except Exception:
+        pass
+
+def rizz_beep_sigma_off_67():
+    try:
+        winsound.Beep(1500, 55)
+        winsound.Beep(900, 70)
+    except Exception:
+        pass
+
+def rizz_beep_skibidy_start_67():
+    try:
+        winsound.Beep(900, 40)
+        winsound.Beep(1200, 40)
+        winsound.Beep(1600, 60)
+    except Exception:
+        pass
+
+def rizz_beep_skibidy_stop_67():
+    try:
+        winsound.Beep(1600, 40)
+        winsound.Beep(1100, 40)
+        winsound.Beep(700, 60)
+    except Exception:
+        pass
+
+class SigmaSkibidyRizzConfig67:
     def __init__(self):
         try:
-            self.width = win32api.GetSystemMetrics(0)
-            self.height = win32api.GetSystemMetrics(1)
+            self.sigma_width_67 = win32api.GetSystemMetrics(0)
+            self.skibidy_height_67 = win32api.GetSystemMetrics(1)
         except Exception:
-            self.width = 1920
-            self.height = 1080
-        self.center_x = self.width // 2
-        self.center_y = self.height // 2
-        self.uniformCaptureSize = 240
-        self.crosshairUniform = self.uniformCaptureSize // 2
-        self.capture_left = self.center_x - self.crosshairUniform
-        self.capture_top = self.center_y - self.crosshairUniform
-        self.region = {"top": self.capture_top, "left": self.capture_left, "width": self.uniformCaptureSize, "height": self.uniformCaptureSize}
+            self.sigma_width_67 = 1920
+            self.skibidy_height_67 = 1080
+        self.rizz_center_x_67 = self.sigma_width_67 // 2
+        self.rizz_center_y_67 = self.skibidy_height_67 // 2
+        self.skibidy_uniform_capture_size_67 = 240
+        self.sigma_crosshair_uniform_67 = self.skibidy_uniform_capture_size_67 // 2
+        self.rizz_capture_left_67 = self.rizz_center_x_67 - self.sigma_crosshair_uniform_67
+        self.rizz_capture_top_67 = self.rizz_center_y_67 - self.sigma_crosshair_uniform_67
+        self.skibidy_region_67 = {
+            "top": self.rizz_capture_top_67,
+            "left": self.rizz_capture_left_67,
+            "width": self.skibidy_uniform_capture_size_67,
+            "height": self.skibidy_uniform_capture_size_67,
+        }
 
+sigma_config_67 = SigmaSkibidyRizzConfig67()
+skibidy_crosshair_u_67 = sigma_config_67.sigma_crosshair_uniform_67
+rizz_region_c_67 = sigma_config_67.skibidy_region_67
 
-config = Config()
-kernel = np.ones((3, 3), np.uint8)
-lower_hsv = np.array([0, 160, 160], dtype=np.uint8)
-upper_hsv = np.array([10, 255, 255], dtype=np.uint8)
-min_area = 20
-max_area = 4000
-min_saturation_floor = 180
-min_value_floor = 200
-shape_filter_enabled = True
-shape_min_aspect = 0.15
-shape_max_aspect = 3.0
-shape_min_solidity = 0.55
-shape_min_extent = 0.20
-context_check_enabled = True
-context_radius = 25
-context_inner_radius = 8
-context_ratio_pct = 25
-context_cyan_h_lo = 85
-context_cyan_h_hi = 135
-context_cyan_s_min = 120
-context_cyan_v_min = 100
-context_dark_v_max = 60
-adaptive_hsv_enabled = False
-adaptive_ranges = []
-adaptive_cycle_frames = 30
-adaptive_last_cycle = 0
-adaptive_samples = []
-adaptive_min_sat = 200
-adaptive_min_samples = 120
-crosshairU = config.crosshairUniform
-regionC = config.region
-robloxSensitivity = 0.55
-PF_MouseSensitivity = 0.5
-PF_AimSensitivity = 1.0
-movementCompensation = 0.0
-PF_sensitivity = PF_MouseSensitivity * PF_AimSensitivity
-finalComputerSensitivityMultiplier = ((robloxSensitivity * PF_sensitivity) / 0.55) + movementCompensation
-deadzone_px = 4
-max_step_px = 6
-smooth_alpha = 0.18
-ema_dx = 0.0
-ema_dy = 0.0
-sub_dx = 0.0
-sub_dy = 0.0
-kp = 0.45
-kd = 0.25
-prev_err_x = 0.0
-prev_err_y = 0.0
-lead_frames = 1.5
-w_area = 0.20
-w_dist = 0.60
-w_stick = 0.40
-switch_cooldown_ms = 120
-hysteresis_pct = 0.15
-max_tracks = 8
-track_miss_limit = 20
-kalman_Q = 0.05
-kalman_R = 0.5
-tracks = {}
-next_track_id = 1
-primary_track_id = None
-last_switch_time = 0.0
-last_lock_cx = None
-last_lock_cy = None
-lock_velocity = (0.0, 0.0)
-roi_radius = 50
-lost_frames = 0
-lost_threshold = 8
-aim_enabled = True
-aim_key = 0x10
-prev_aim_state = 0
-fov_radius = 70
-lock_strength = 1.0
-offset_x = 0
-offset_y = 0
-active_ranges = []
-active_hexes = []
-running = False
-worker = None
-lock_cx = None
-lock_cy = None
-overlay = None
-overlay_canvas = None
-status_lock_hex = "-"
-status_ranges = "0"
-status_contours = "-"
-status_target = "-"
-status_err = "-, -"
-status_hit = "-"
-status_loop_hz = "0"
-status_tracks = "0"
-status_ctx = "-"
-debug_mask_visible = False
+SIGMA_BASE_DIR_67 = os.path.dirname(os.path.abspath(__file__))
+SKIBIDY_CONFIGS_DIR_67 = os.path.join(SIGMA_BASE_DIR_67, "configs")
+RIZZ_LAST_SESSION_FILE_67 = os.path.join(SKIBIDY_CONFIGS_DIR_67, "_last_session.json")
+SIGMA_LEGACY_SETTINGS_FILE_67 = os.path.join(SIGMA_BASE_DIR_67, "settings.json")
 
-class Kalman2D:
-    def __init__(self):
-        self.x = np.zeros((4, 1), dtype=float)
-        self.P = np.eye(4, dtype=float) * 100.0
-        self.F = np.array([[1, 0, 1, 0], [0, 1, 0, 1], [0, 0, 1, 0], [0, 0, 0, 1]], dtype=float)
-        self.H = np.array([[1, 0, 0, 0], [0, 1, 0, 0]], dtype=float)
-        self.Q = np.eye(4, dtype=float) * kalman_Q
-        self.R = np.eye(2, dtype=float) * kalman_R
-        self.initialized = False
+os.makedirs(SKIBIDY_CONFIGS_DIR_67, exist_ok=True)
 
-    def init(self, x, y):
-        self.x = np.array([[x], [y], [0.0], [0.0]], dtype=float)
-        self.P = np.eye(4, dtype=float) * 10.0
-        self.initialized = True
+skibidy_kernel_67 = np.ones((3, 3), np.uint8)
+rizz_min_area_67 = 60
 
-    def predict(self):
-        if not self.initialized:
-            return 0.0, 0.0, 0.0, 0.0
-        self.x = self.F @ self.x
-        self.P = self.F @ self.P @ self.F.T + self.Q
-        return float(self.x[0, 0]), float(self.x[1, 0]), float(self.x[2, 0]), float(self.x[3, 0])
+sigma_roblox_sensitivity_67 = 0.55
+skibidy_pf_mouse_sensitivity_67 = 0.5
+rizz_pf_aim_sensitivity_67 = 1.0
+sigma_movement_compensation_67 = 0.0
 
-    def update(self, zx, zy):
-        if not self.initialized:
-            self.init(zx, zy)
-            return zx, zy
-        z = np.array([[zx], [zy]], dtype=float)
-        y = z - self.H @ self.x
-        S = self.H @ self.P @ self.H.T + self.R
-        try:
-            K = self.P @ self.H.T @ np.linalg.inv(S)
-        except np.linalg.LinAlgError:
-            return float(self.x[0, 0]), float(self.x[1, 0])
-        self.x = self.x + K @ y
-        I = np.eye(4, dtype=float)
-        self.P = (I - K @ self.H) @ self.P
-        return float(self.x[0, 0]), float(self.x[1, 0])
+skibidy_deadzone_px_67 = 6
+rizz_max_step_px_67 = 6
+sigma_smooth_alpha_67 = 0.18
+skibidy_ema_dx_67 = 0.0
+rizz_ema_dy_67 = 0.0
+sigma_kp_67 = 0.45
+skibidy_kd_67 = 0.25
+rizz_prev_err_x_67 = 0.0
+sigma_prev_err_y_67 = 0.0
+skibidy_track_cx_67 = None
+rizz_track_cy_67 = None
+sigma_roi_radius_67 = 50
 
-    def pos(self):
-        return float(self.x[0, 0]), float(self.x[1, 0])
+skibidy_fov_radius_67 = 80
+rizz_lock_strength_67 = 1.0
+sigma_offset_x_67 = 0
+skibidy_offset_y_67 = 0
 
-    def vel(self):
-        return float(self.x[2, 0]), float(self.x[3, 0])
+rizz_current_aim_vk_67 = 0x02
+sigma_current_toggle_vk_67 = 0x77
+skibidy_prev_toggle_state_67 = 0
 
+rizz_active_ranges_67 = []
+sigma_locked_hex_67 = ""
+skibidy_locked_hsv_67 = None
+rizz_running_67 = False
+sigma_worker_67 = None
+skibidy_aim_enabled_67 = True
 
-class Track:
-    __slots__ = ("id", "kalman", "hits", "miss", "last_cx", "last_cy", "last_seen", "confidence")
+rizz_lower_hsv_67 = np.array([0, 160, 160], dtype=np.uint8)
+sigma_upper_hsv_67 = np.array([10, 255, 255], dtype=np.uint8)
 
-    def __init__(self, tid, cx, cy, frame_idx):
-        self.id = tid
-        self.kalman = Kalman2D()
-        self.kalman.init(cx, cy)
-        self.hits = 1
-        self.miss = 0
-        self.last_cx = cx
-        self.last_cy = cy
-        self.last_seen = frame_idx
-        self.confidence = 1.0
+skibidy_overlay_67 = None
+rizz_overlay_canvas_67 = None
+sigma_transparent_supported_67 = False
 
+skibidy_overlay_target_screen_67 = None
+rizz_overlay_fps_value_67 = 0
 
-def round_to_2(value):
-    return round(float(value), 2)
+sigma_rainbow_hue_67 = 0
 
+SKIBIDY_VK_NAMES_67 = {
+    0x01: "MOUSE L", 0x02: "MOUSE R", 0x04: "MOUSE M",
+    0x05: "MOUSE S1", 0x06: "MOUSE S2",
+    0x08: "BACKSPACE", 0x09: "TAB", 0x0D: "ENTER",
+    0x10: "SHIFT", 0x11: "CTRL", 0x12: "ALT", 0x13: "PAUSE",
+    0x14: "CAPS", 0x1B: "ESC", 0x20: "SPACE",
+    0x21: "PGUP", 0x22: "PGDN", 0x23: "END", 0x24: "HOME",
+    0x25: "LEFT", 0x26: "UP", 0x27: "RIGHT", 0x28: "DOWN",
+    0x2D: "INS", 0x2E: "DEL",
+    0x70: "F1", 0x71: "F2", 0x72: "F3", 0x73: "F4",
+    0x74: "F5", 0x75: "F6", 0x76: "F7", 0x77: "F8",
+    0x78: "F9", 0x79: "F10", 0x7A: "F11", 0x7B: "F12",
+}
 
-def format_value(value, digits=2):
-    return f"{round_to_2(value):.{digits}f}"
+def rizz_vk_display_67(vk):
+    if vk == 0:
+        return "None"
+    if vk in SKIBIDY_VK_NAMES_67:
+        return SKIBIDY_VK_NAMES_67[vk]
+    if 0x30 <= vk <= 0x39:
+        return chr(vk)
+    if 0x41 <= vk <= 0x5A:
+        return chr(vk)
+    return f"0x{vk:02X}"
 
+def sigma_key_event_to_vk_67(key):
+    try:
+        if hasattr(key, "vk") and key.vk is not None:
+            return int(key.vk)
+    except Exception:
+        pass
+    s = str(key).replace("Key.", "").lower()
+    return {
+        "alt": 0x12, "shift": 0x10, "ctrl": 0x11,
+        "space": 0x20, "tab": 0x09, "enter": 0x0D, "esc": 0x1B,
+        "up": 0x26, "down": 0x28, "left": 0x25, "right": 0x27,
+        "f1": 0x70, "f2": 0x71, "f3": 0x72, "f4": 0x73,
+        "f5": 0x74, "f6": 0x75, "f7": 0x76, "f8": 0x77,
+        "f9": 0x78, "f10": 0x79, "f11": 0x7A, "f12": 0x7B,
+    }.get(s, 0)
 
-def build_mask(frame_hsv):
-    m = None
-    for lo, up in active_ranges:
-        mm = cv2.inRange(frame_hsv, lo, up)
-        m = mm if m is None else cv2.bitwise_or(m, mm)
-    for lo, up in adaptive_ranges:
-        mm = cv2.inRange(frame_hsv, lo, up)
-        m = mm if m is None else cv2.bitwise_or(m, mm)
-    if m is None:
-        m = cv2.inRange(frame_hsv, lower_hsv, upper_hsv)
-    return m
+def skibidy_mouse_event_to_vk_67(button):
+    return {
+        pmouse.Button.left: 0x01, pmouse.Button.right: 0x02,
+        pmouse.Button.middle: 0x04,
+        pmouse.Button.x1: 0x05, pmouse.Button.x2: 0x06,
+    }.get(button, 0)
 
-
-def hex_to_bgr(s):
+def rizz_hex_to_bgr_67(s):
     s = s.strip()
     if s.startswith("#"):
         s = s[1:]
     if len(s) == 6:
         try:
-            r = int(s[0:2], 16)
-            g = int(s[2:4], 16)
-            b = int(s[4:6], 16)
-            return (b, g, r)
-        except ValueError:
+            return (int(s[4:6], 16), int(s[2:4], 16), int(s[0:2], 16))
+        except Exception:
             return None
     return None
 
-
-def range_from_hex(s, tol_h=10, tol_s=60, tol_v=60, with_floor=True):
-    bgr = hex_to_bgr(s)
+def sigma_range_from_hex_67(s, tol_h=10, tol_s=60, tol_v=60):
+    bgr = rizz_hex_to_bgr_67(s)
     if bgr is None:
         return None
     pix = np.uint8([[list(bgr)]])
     hsv = cv2.cvtColor(pix, cv2.COLOR_BGR2HSV)[0, 0]
-    h = int(hsv[0])
-    s_ = int(hsv[1])
-    v = int(hsv[2])
-    s_lo = max(s_ - tol_s, 0)
-    v_lo = max(v - tol_v, 0)
-    if with_floor:
-        s_lo = max(s_lo, min_saturation_floor)
-        v_lo = max(v_lo, min_value_floor)
-    lo = np.array([max(h - tol_h, 0), s_lo, v_lo], dtype=np.uint8)
-    up = np.array([min(h + tol_h, 179), min(s_ + tol_s, 255), min(v + tol_v, 255)], dtype=np.uint8)
+    h, sa, v = int(hsv[0]), int(hsv[1]), int(hsv[2])
+    lo = np.array([max(h - tol_h, 0), max(sa - tol_s, 0),
+                   max(v - tol_v, 0)], dtype=np.uint8)
+    up = np.array([min(h + tol_h, 179), min(sa + tol_s, 255),
+                   min(v + tol_v, 255)], dtype=np.uint8)
     return lo, up
 
+def skibidy_hsv_to_hex_67(h, s, v):
+    bgr = cv2.cvtColor(np.uint8([[[h, s, v]]]), cv2.COLOR_HSV2BGR)[0][0]
+    return f"#{int(bgr[2]):02X}{int(bgr[1]):02X}{int(bgr[0]):02X}"
 
-def range_from_hex_bright(s, tol_h=8):
-    bgr = hex_to_bgr(s)
-    if bgr is None:
-        return None
-    pix = np.uint8([[list(bgr)]])
-    hsv = cv2.cvtColor(pix, cv2.COLOR_BGR2HSV)[0, 0]
-    h = int(hsv[0])
-    lo = np.array([max(h - tol_h, 0), min_saturation_floor, min_value_floor], dtype=np.uint8)
-    up = np.array([min(h + tol_h, 179), 255, 255], dtype=np.uint8)
-    return lo, up
+def rizz_rainbow_color_67():
+    r, g, b = colorsys.hsv_to_rgb(sigma_rainbow_hue_67 / 360.0, 1.0, 1.0)
+    return f"#{int(r*255):02X}{int(g*255):02X}{int(b*255):02X}"
 
+def sigma_set_locked_hex_67(hex_str):
+    global sigma_locked_hex_67, skibidy_locked_hsv_67
+    sigma_locked_hex_67 = hex_str.strip().upper()
+    bgr = rizz_hex_to_bgr_67(sigma_locked_hex_67)
+    if bgr is not None:
+        pix = np.uint8([[list(bgr)]])
+        hsv = cv2.cvtColor(pix, cv2.COLOR_BGR2HSV)[0, 0]
+        skibidy_locked_hsv_67 = (int(hsv[0]), int(hsv[1]), int(hsv[2]))
+    else:
+        skibidy_locked_hsv_67 = None
 
-def color_is_marker_grade(hex_str):
-    bgr = hex_to_bgr(hex_str)
-    if bgr is None:
-        return False
-    pix = np.uint8([[list(bgr)]])
-    hsv = cv2.cvtColor(pix, cv2.COLOR_BGR2HSV)[0, 0]
-    s_ = int(hsv[1])
-    v = int(hsv[2])
-    return s_ >= 170 and v >= 200
+def skibidy_build_mask_67(frame_hsv):
+    if not rizz_active_ranges_67:
+        return cv2.inRange(frame_hsv, rizz_lower_hsv_67, sigma_upper_hsv_67)
+    m = None
+    for lo, up in rizz_active_ranges_67:
+        mm = cv2.inRange(frame_hsv, lo, up)
+        m = mm if m is None else cv2.bitwise_or(m, mm)
+    return m
 
-
-def analyze_image_colors(path, k=5):
-    img = cv2.imread(path, cv2.IMREAD_UNCHANGED)
-    if img is None:
-        return []
-    if img.ndim == 3 and img.shape[2] == 4:
-        img = cv2.cvtColor(img, cv2.COLOR_BGRA2BGR)
-    Z = img.reshape((-1, 3)).astype(np.float32)
-    criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 10, 1.0)
-    ret, label, center = cv2.kmeans(Z, k, None, criteria, 10, cv2.KMEANS_PP_CENTERS)
-    centers = center.astype(np.uint8)
-    res = []
-    for c in centers:
-        r, g, b = int(c[2]), int(c[1]), int(c[0])
-        res.append("#%02X%02X%02X" % (r, g, b))
-    return res
-
-
-def analyze_folder_colors(folder, k=8, max_images=50, sample_per_image=4000):
-    try:
-        files = [os.path.join(folder, f) for f in os.listdir(folder) if f.lower().endswith((".png", ".jpg", ".jpeg", ".bmp"))]
-    except Exception:
-        files = []
-    if not files:
-        return []
-    files = files[:max_images]
-    samples = []
-    for p in files:
+def rizz_analyze_files_67(paths, skip_dark=True, skip_gray=True, top_n=12):
+    hist = np.zeros(18 * 8 * 8, dtype=np.int64)
+    total = 0
+    processed = 0
+    for p in paths:
         img = cv2.imread(p, cv2.IMREAD_UNCHANGED)
         if img is None:
             continue
         if img.ndim == 3 and img.shape[2] == 4:
             img = cv2.cvtColor(img, cv2.COLOR_BGRA2BGR)
-        flat = img.reshape((-1, 3))
-        n = flat.shape[0]
-        if n > sample_per_image:
-            idx = np.random.choice(n, sample_per_image, replace=False)
-            samples.append(flat[idx])
-        else:
-            samples.append(flat)
-    if not samples:
-        return []
-    Z = np.vstack(samples).astype(np.float32)
-    criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 10, 1.0)
-    ret, label, center = cv2.kmeans(Z, k, None, criteria, 10, cv2.KMEANS_PP_CENTERS)
-    centers = center.astype(np.uint8)
-    lbl = label.ravel()
-    counts = np.bincount(lbl, minlength=k)
-    order = np.argsort(-counts)
-    res = []
-    for i in order:
-        c = centers[i]
-        r, g, b = int(c[2]), int(c[1]), int(c[0])
-        res.append("#%02X%02X%02X" % (r, g, b))
-    return res
+        processed += 1
+        hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
+        Hc = (hsv[:, :, 0].astype(np.int32) * 18 // 180).clip(0, 17)
+        Sc = (hsv[:, :, 1].astype(np.int32) * 8 // 256).clip(0, 7)
+        Vc = (hsv[:, :, 2].astype(np.int32) * 8 // 256).clip(0, 7)
+        m = np.ones(Hc.shape, dtype=bool)
+        if skip_dark:
+            m &= hsv[:, :, 2] > 40
+        if skip_gray:
+            m &= hsv[:, :, 1] > 40
+        idx = (Hc * 64 + Sc * 8 + Vc).ravel()
+        mv = m.ravel().astype(np.int64)
+        counts = np.bincount(idx, weights=mv, minlength=18 * 8 * 8)
+        hist += counts.astype(np.int64)
+        total += int(mv.sum())
+    if total == 0:
+        return [], processed, 0
+    order = np.argsort(hist)[::-1]
+    rows = []
+    for i in order[:top_n]:
+        cnt = int(hist[i])
+        if cnt == 0:
+            continue
+        hh = i // 64
+        ss = (i % 64) // 8
+        vv = i % 8
+        H = min(int((hh + 0.5) * 10), 179)
+        S = min(int((ss + 0.5) * 32), 255)
+        V = min(int((vv + 0.5) * 32), 255)
+        rows.append({"hsv": (H, S, V), "hex": skibidy_hsv_to_hex_67(H, S, V),
+                     "count": cnt, "pct": cnt / total * 100.0})
+    return rows, processed, total
 
+def sigma_analyze_folder_colors_67(folder, skip_dark=True, skip_gray=True, top_n=12):
+    try:
+        exts = (".png", ".jpg", ".jpeg", ".bmp", ".webp")
+        files = [os.path.join(folder, f) for f in os.listdir(folder)
+                 if f.lower().endswith(exts)]
+    except Exception:
+        return [], 0, 0
+    if not files:
+        return [], 0, 0
+    return rizz_analyze_files_67(files, skip_dark, skip_gray, top_n)
 
-def rebuild_active_ranges_from_hexes():
-    global active_ranges
-    active_ranges = []
-    for hx in active_hexes:
-        r1 = range_from_hex(hx, tol_h_var.get(), tol_s_var.get(), tol_v_var.get(), with_floor=True)
-        if r1:
-            active_ranges.append(r1)
-        r2 = range_from_hex_bright(hx)
-        if r2:
-            active_ranges.append(r2)
+def skibidy_analyze_single_image_67(path, top_n=8):
+    return rizz_analyze_files_67([path], top_n=top_n)[0]
 
+rizz_verify_enabled_67 = False
+sigma_verify_hex_list_67 = ["#3AA0FF"]
+skibidy_verify_tol_h_67 = 12
+rizz_verify_tol_s_67 = 70
+sigma_verify_tol_v_67 = 70
+skibidy_verify_roi_67 = 40
+rizz_verify_min_px_67 = 8
+sigma_verify_frames_required_67 = 1
+skibidy_verify_ranges_67 = []
+rizz_verify_ok_frames_67 = 0
+sigma_last_verify_px_67 = -1
 
-def get_key_name(key_code):
-    if key_code == 0x01:
-        return "Left Mouse"
-    if key_code == 0x02:
-        return "Right Mouse"
-    if key_code == 0x04:
-        return "Middle Mouse"
-    if key_code == 0x05:
-        return "Mouse 4"
-    if key_code == 0x06:
-        return "Mouse 5"
-    if key_code == 0x10:
-        return "Left Shift"
-    if key_code == 0x11:
-        return "Left Ctrl"
-    if key_code == 0x12:
-        return "Left Alt"
-    if key_code == 0x20:
-        return "Space"
-    if key_code == 0x0D:
-        return "Enter"
-    if key_code == 0x1B:
-        return "Escape"
-    if key_code == 0x09:
-        return "Tab"
-    if key_code == 0x14:
-        return "Caps Lock"
-    if key_code == 0x08:
-        return "Backspace"
-    if key_code == 0x2E:
-        return "Delete"
-    if key_code == 0x2D:
-        return "Insert"
-    if key_code == 0x24:
-        return "Home"
-    if key_code == 0x23:
-        return "End"
-    if key_code == 0x21:
-        return "Page Up"
-    if key_code == 0x22:
-        return "Page Down"
-    if key_code == 0x25:
-        return "Left Arrow"
-    if key_code == 0x26:
-        return "Up Arrow"
-    if key_code == 0x27:
-        return "Right Arrow"
-    if key_code == 0x28:
-        return "Down Arrow"
-    if 0x70 <= key_code <= 0x7B:
-        return f"F{key_code - 0x6F}"
-    if key_code == 0xA0:
-        return "Left Shift"
-    if key_code == 0xA1:
-        return "Right Shift"
-    if key_code == 0xA2:
-        return "Left Ctrl"
-    if key_code == 0xA3:
-        return "Right Ctrl"
-    if key_code == 0xA4:
-        return "Left Alt"
-    if key_code == 0xA5:
-        return "Right Alt"
-    if 0x60 <= key_code <= 0x69:
-        return f"Numpad {key_code - 0x60}"
-    if 0x30 <= key_code <= 0x39:
-        return chr(key_code)
-    if 0x41 <= key_code <= 0x5A:
-        return chr(key_code)
-    return f"Key 0x{key_code:02X}"
+def skibidy_rebuild_verify_ranges_67():
+    global skibidy_verify_ranges_67
+    skibidy_verify_ranges_67 = []
+    for h in sigma_verify_hex_list_67:
+        rng = sigma_range_from_hex_67(h, skibidy_verify_tol_h_67,
+                                      rizz_verify_tol_s_67,
+                                      sigma_verify_tol_v_67)
+        if rng:
+            skibidy_verify_ranges_67.append(rng)
 
+def rizz_verify_target_67(frame_hsv, cx, cy):
+    global sigma_last_verify_px_67, rizz_verify_ok_frames_67
 
-KEYSYM_TO_VK = {
-    "Shift_L": 0xA0,
-    "Shift_R": 0xA1,
-    "Control_L": 0xA2,
-    "Control_R": 0xA3,
-    "Alt_L": 0xA4,
-    "Alt_R": 0xA5,
-    "Caps_Lock": 0x14,
-    "Escape": 0x1B,
-    "Return": 0x0D,
-    "BackSpace": 0x08,
-    "Tab": 0x09,
-    "space": 0x20,
-    "Delete": 0x2E,
-    "Insert": 0x2D,
-    "Home": 0x24,
-    "End": 0x23,
-    "Prior": 0x21,
-    "Next": 0x22,
-    "Left": 0x25,
-    "Up": 0x26,
-    "Right": 0x27,
-    "Down": 0x28,
+    if not rizz_verify_enabled_67:
+        sigma_last_verify_px_67 = -1
+        rizz_verify_ok_frames_67 = 0
+        return True
+    if not skibidy_verify_ranges_67:
+        sigma_last_verify_px_67 = -1
+        return True
+
+    h, w = frame_hsv.shape[:2]
+    y0 = max(0, int(cy) - skibidy_verify_roi_67)
+    y1 = min(h, int(cy) + skibidy_verify_roi_67)
+    x0 = max(0, int(cx) - skibidy_verify_roi_67)
+    x1 = min(w, int(cx) + skibidy_verify_roi_67)
+    if x1 <= x0 or y1 <= y0:
+        sigma_last_verify_px_67 = 0
+        rizz_verify_ok_frames_67 = 0
+        return False
+    roi = frame_hsv[y0:y1, x0:x1]
+
+    best_px = 0
+    for rng in skibidy_verify_ranges_67:
+        m = cv2.inRange(roi, rng[0], rng[1])
+        px = int(cv2.countNonZero(m))
+        if px > best_px:
+            best_px = px
+    sigma_last_verify_px_67 = best_px
+    marker_present = best_px >= rizz_verify_min_px_67
+
+    if sigma_verify_frames_required_67 > 1:
+        if marker_present:
+            rizz_verify_ok_frames_67 += 1
+            return rizz_verify_ok_frames_67 >= sigma_verify_frames_required_67
+        rizz_verify_ok_frames_67 = 0
+        return False
+    return marker_present
+
+SKIBIDY_LANG_67 = {
+    "th": {
+        "app_name": "Aimzen",
+        "lang_btn": "EN",
+        "status_running": "กำลังทำงาน",
+        "status_stopped": "หยุดแล้ว",
+        "btn_start": "เริ่ม", "btn_stop": "หยุด",
+
+        "nav_aim": "Aimbot", "nav_visual": "การแสดงผล",
+        "nav_filter": "กรองสี", "nav_adv": "ขั้นสูง", "nav_prof": "โปรไฟล์",
+
+        "sec_target_color": "สีเป้าหมาย",
+        "sec_aim_response": "การตอบสนองการเล็ง",
+        "sec_key_bindings": "ปุ่มลัด",
+        "sec_overlay": "ออฟเวอร์เลย์",
+        "sec_palette_folder": "โฟลเดอร์จานสี",
+        "sec_palette_detected": "จานสีที่ตรวจพบ",
+        "sec_filter_rule": "เงื่อนไขกรองสี",
+        "sec_marker_color": "สีเงื่อนไข",
+        "sec_marker_detection": "การตรวจจับสีเงื่อนไข",
+        "sec_diag": "ไดแอกโนสติกส์",
+        "sec_movement": "ชดเชยการเคลื่อนไหว",
+        "sec_gains": "ตัวปรับค่า",
+        "sec_tracking": "การติดตามเป้า",
+        "sec_profiles": "โปรไฟล์ที่บันทึกไว้",
+        "sec_storage": "ที่เก็บข้อมูล",
+        "sec_crosshair": "รูปแบบเป้า",
+
+        "lbl_hex": "รหัสสี",
+        "lbl_hue_tol": "ค่าความคลาดเคลื่อน Hue",
+        "lbl_sat_tol": "ค่าความคลาดเคลื่อน Saturation",
+        "lbl_bri_tol": "ค่าความคลาดเคลื่อน Brightness",
+        "lbl_lock_strength": "ความแรงล็อค",
+        "lbl_smoothing": "ความนุ่มนวล",
+        "lbl_mouse_sens": "ความไวเมาส์",
+        "lbl_aim_sens": "ความไวการเล็ง",
+        "lbl_game_sens": "ความไวในเกม",
+        "lbl_max_step": "ก้าวสูงสุดต่อเฟรม",
+        "lbl_deadzone": "จุดตาย",
+        "lbl_fov": "มุมมอง (FOV)",
+        "lbl_offset_x": "ออฟเซ็ตแนว X",
+        "lbl_offset_y": "ออฟเซ็ตแนว Y",
+        "lbl_aim_key": "ปุ่มเล็ง",
+        "lbl_enable_toggle": "ปุ่มเปิด/ปิดระบบ",
+        "lbl_panic_key": "ปุ่มหยุดฉุกเฉิน",
+
+        "btn_apply": "ใช้",
+        "btn_load_img": "โหลดรูปเดียว",
+        "btn_scan": "สแกนโฟลเดอร์",
+        "btn_lock_color": "ล็อคสีที่เลือก",
+        "btn_clear_palette": "ล้างจานสี",
+        "btn_save": "บันทึก",
+        "btn_rename": "เปลี่ยนชื่อ",
+        "btn_delete": "ลบ",
+        "btn_load_sel": "โหลดโปรไฟล์ที่เลือก",
+        "btn_reset_all": "รีเซ็ตทั้งหมด",
+        "btn_auto_detect": "ตรวจจับสีฟ้าอัตโนมัติ",
+
+        "chk_show_fov": "แสดงวง FOV",
+        "chk_show_crosshair": "แสดงเป้ากลางจอ",
+        "chk_show_box": "แสดงกรอบเป้า",
+        "chk_show_fps": "แสดงตัวนับ FPS",
+        "chk_show_aim_line": "แสดงเส้นเล็ง",
+        "chk_hide_idle": "ซ่อนออฟเวอร์เลย์เมื่อไม่เล็ง",
+        "chk_exclude_capture": "ซ่อนจากการบันทึกหน้าจอ",
+        "chk_rainbow": "โหมดสีรุ้ง",
+        "chk_ignore_dark": "ข้ามพิกเซลสีมืด",
+        "chk_ignore_gray": "ข้ามพิกเซลสีเทา",
+
+        "chk_enable_filter": "เปิดใช้การตรวจสอบสีเงื่อนไข",
+        "lbl_marker_hexes": "สีเงื่อนไข (คั่นด้วยจุลภาค)",
+        "lbl_sample_radius": "รัศมีสุ่มตัวอย่าง (px)",
+        "lbl_required_px": "จำนวนพิกเซลขั้นต่ำ",
+        "lbl_required_frames": "จำนวนเฟรมติดกัน",
+        "hint_filter": "ติ๊กถูก = ล็อคเฉพาะเมื่อเจอทั้งสีหลักและสีเงื่อนไขพร้อมกัน\nไม่ติ๊ก = ล็อคตามสีหลักอย่างเดียว (ไม่สนใจสีเงื่อนไข)",
+        "lbl_marker_diag": "พิกเซลสีเงื่อนไข:",
+
+        "lbl_movement_comp": "ชดเชยการเคลื่อนไหว",
+        "lbl_kp": "เกนสัดส่วน (kp)",
+        "lbl_kd": "เกนอนุพันธ์ (kd)",
+        "lbl_track_radius": "รัศมีการติดตาม",
+
+        "lbl_profile_name": "ชื่อโปรไฟล์",
+        "autosave_text": "ทุกการเปลี่ยนแปลงจะถูกบันทึกอัตโนมัติ",
+        "confirm_reset_title": "รีเซ็ตทั้งหมด",
+        "confirm_reset_msg": "รีเซ็ตค่าทั้งหมดและโปรไฟล์? ไม่สามารถย้อนกลับได้",
+
+        "lbl_overlay_color": "สีออฟเวอร์เลย์",
+        "lbl_folder_path": "ที่อยู่โฟลเดอร์",
+        "lbl_crosshair_style": "รูปแบบเป้า",
+        "lbl_crosshair_size": "ขนาดเป้า",
+
+        "ch_dot": "จุด", "ch_cross": "กากบาท",
+        "ch_circle": "วงกลม", "ch_t_cross": "ตัว T",
+        "ch_x_cross": "ตัว X", "ch_chevron": "ตัว V",
+        "ch_dot_circle": "จุดในวง", "ch_brackets": "วงเล็บมุม",
+    },
+    "en": {
+        "app_name": "Aimzen",
+        "lang_btn": "TH",
+        "status_running": "Running",
+        "status_stopped": "Stopped",
+        "btn_start": "Start", "btn_stop": "Stop",
+
+        "nav_aim": "Aimbot", "nav_visual": "Visual",
+        "nav_filter": "Color Filter", "nav_adv": "Advanced",
+        "nav_prof": "Profiles",
+
+        "sec_target_color": "Target Color",
+        "sec_aim_response": "Aim Response",
+        "sec_key_bindings": "Key Bindings",
+        "sec_overlay": "Overlay",
+        "sec_palette_folder": "Palette Folder",
+        "sec_palette_detected": "Detected Palette",
+        "sec_filter_rule": "Filter Rule",
+        "sec_marker_color": "Condition Color",
+        "sec_marker_detection": "Condition Color Detection",
+        "sec_diag": "Diagnostics",
+        "sec_movement": "Movement Compensation",
+        "sec_gains": "Controller Gains",
+        "sec_tracking": "Target Tracking",
+        "sec_profiles": "Saved Profiles",
+        "sec_storage": "Storage",
+        "sec_crosshair": "Crosshair Style",
+
+        "lbl_hex": "Hex",
+        "lbl_hue_tol": "Hue tolerance",
+        "lbl_sat_tol": "Saturation tolerance",
+        "lbl_bri_tol": "Brightness tolerance",
+        "lbl_lock_strength": "Lock strength",
+        "lbl_smoothing": "Smoothing",
+        "lbl_mouse_sens": "Mouse sensitivity",
+        "lbl_aim_sens": "Aim sensitivity",
+        "lbl_game_sens": "Game sensitivity",
+        "lbl_max_step": "Max step per frame",
+        "lbl_deadzone": "Dead zone",
+        "lbl_fov": "Field of view",
+        "lbl_offset_x": "Aim offset X",
+        "lbl_offset_y": "Aim offset Y",
+        "lbl_aim_key": "Aim key",
+        "lbl_enable_toggle": "Enable toggle",
+        "lbl_panic_key": "Panic key",
+
+        "btn_apply": "Apply",
+        "btn_load_img": "Load single image",
+        "btn_scan": "Scan folder",
+        "btn_lock_color": "Lock chosen color",
+        "btn_clear_palette": "Clear palette",
+        "btn_save": "Save",
+        "btn_rename": "Rename",
+        "btn_delete": "Delete",
+        "btn_load_sel": "Load Selected Profile",
+        "btn_reset_all": "Reset All",
+        "btn_auto_detect": "Auto-detect blue condition color",
+
+        "chk_show_fov": "Show FOV ring",
+        "chk_show_crosshair": "Show center cross",
+        "chk_show_box": "Show target box",
+        "chk_show_fps": "Show FPS counter",
+        "chk_show_aim_line": "Show aim line",
+        "chk_hide_idle": "Hide overlay when not aiming",
+        "chk_exclude_capture": "Hide from screen capture",
+        "chk_rainbow": "Rainbow mode",
+        "chk_ignore_dark": "Ignore dark pixels",
+        "chk_ignore_gray": "Ignore gray pixels",
+
+        "chk_enable_filter": "Enable condition color check",
+        "lbl_marker_hexes": "Condition hexes (comma-separated)",
+        "lbl_sample_radius": "Sample radius (px)",
+        "lbl_required_px": "Required pixel count",
+        "lbl_required_frames": "Required consecutive frames",
+        "hint_filter": "Checked   = lock only when BOTH the main color and the condition color are detected.\nUnchecked = lock based on the main color only (condition color is ignored).",
+        "lbl_marker_diag": "Condition pixels:",
+
+        "lbl_movement_comp": "Movement comp",
+        "lbl_kp": "Proportional gain (kp)",
+        "lbl_kd": "Derivative gain (kd)",
+        "lbl_track_radius": "Track radius",
+
+        "lbl_profile_name": "Profile name",
+        "autosave_text": "Every change is auto-saved to the configs folder.",
+        "confirm_reset_title": "Reset All",
+        "confirm_reset_msg": "Reset all settings and profiles? This cannot be undone.",
+
+        "lbl_overlay_color": "Overlay color",
+        "lbl_folder_path": "Folder path",
+        "lbl_crosshair_style": "Crosshair style",
+        "lbl_crosshair_size": "Crosshair size",
+
+        "ch_dot": "Dot", "ch_cross": "Cross",
+        "ch_circle": "Circle", "ch_t_cross": "T-Cross",
+        "ch_x_cross": "X-Cross", "ch_chevron": "Chevron",
+        "ch_dot_circle": "Dot + Circle", "ch_brackets": "Corner Brackets",
+    },
 }
 
+sigma_current_lang_67 = "th"
 
-def _add_keysym_maps():
-    for i in range(1, 13):
-        KEYSYM_TO_VK[f"F{i}"] = 0x6F + i
-    for c in "ABCDEFGHIJKLMNOPQRSTUVWXYZ":
-        KEYSYM_TO_VK[c.lower()] = ord(c)
-        KEYSYM_TO_VK[c] = ord(c)
-    for c in "0123456789":
-        KEYSYM_TO_VK[c] = ord(c)
+def rizz_T_67(key):
+    return SKIBIDY_LANG_67[sigma_current_lang_67].get(key, key)
 
+skibidy_i18n_widgets_67 = []
+rizz_i18n_menus_67 = []
 
-_add_keysym_maps()
+def sigma_reg_67(widget, key, prop="text", uppercase=False):
+    skibidy_i18n_widgets_67.append((widget, key, prop, uppercase))
 
+def skibidy_reg_menu_67(menu, keys):
+    rizz_i18n_menus_67.append((menu, keys))
 
-def shape_ok(contour, area):
-    if not shape_filter_enabled:
-        return True
-    x, y, w, h = cv2.boundingRect(contour)
-    if w <= 0 or h <= 0:
-        return False
-    aspect = w / float(h)
-    if aspect < shape_min_aspect or aspect > shape_max_aspect:
-        return False
-    extent = area / float(w * h)
-    if extent < shape_min_extent:
-        return False
-    try:
-        hull = cv2.convexHull(contour)
-        hull_area = cv2.contourArea(hull)
-        if hull_area > 0:
-            solidity = area / hull_area
-            if solidity < shape_min_solidity:
-                return False
-    except Exception:
-        pass
-    return True
-
-
-def context_ok(frame_hsv, cx, cy):
-    if not context_check_enabled:
-        return True
-    h, w = frame_hsv.shape[:2]
-    cx_i = int(round(cx))
-    cy_i = int(round(cy))
-    y0 = max(0, cy_i - context_radius)
-    y1 = min(h, cy_i + context_radius + 1)
-    x0 = max(0, cx_i - context_radius)
-    x1 = min(w, cx_i + context_radius + 1)
-    if (x1 - x0) < 6 or (y1 - y0) < 6:
-        return False
-    patch = frame_hsv[y0:y1, x0:x1]
-    ph, pw = patch.shape[:2]
-    ccx = cx_i - x0
-    ccy = cy_i - y0
-    yy, xx = np.ogrid[:ph, :pw]
-    d2 = (xx - ccx) ** 2 + (yy - ccy) ** 2
-    annulus = (d2 >= context_inner_radius * context_inner_radius) & (d2 <= context_radius * context_radius)
-    total = int(annulus.sum())
-    if total == 0:
-        return False
-    Hc = patch[:, :, 0]
-    Sc = patch[:, :, 1]
-    Vc = patch[:, :, 2]
-    cyan = (Hc >= context_cyan_h_lo) & (Hc <= context_cyan_h_hi) & (Sc >= context_cyan_s_min) & (Vc >= context_cyan_v_min)
-    dark = Vc <= context_dark_v_max
-    hits = int(((cyan | dark) & annulus).sum())
-    ratio = hits / float(total)
-    return ratio >= (context_ratio_pct / 100.0)
-
-
-def adaptive_sample_update(frame_hsv, contour):
-    if not adaptive_hsv_enabled or contour is None:
-        return
-    try:
-        x, y, w, h = cv2.boundingRect(contour)
-        if w < 3 or h < 3:
-            return
-        cx = x + w // 2
-        cy = y + h // 2
-        r = 3
-        y0 = max(0, cy - r)
-        y1 = min(frame_hsv.shape[0], cy + r + 1)
-        x0 = max(0, cx - r)
-        x1 = min(frame_hsv.shape[1], cx + r + 1)
-        patch = frame_hsv[y0:y1, x0:x1].reshape(-1, 3)
-        sel = patch[patch[:, 1] >= adaptive_min_sat]
-        if sel.shape[0] > 0:
-            adaptive_samples.append(sel.astype(np.float32))
-    except Exception:
-        pass
-
-
-def adaptive_cycle_commit():
-    global adaptive_samples, adaptive_ranges
-    if not adaptive_hsv_enabled:
-        adaptive_samples = []
-        adaptive_ranges = []
-        return
-    if not adaptive_samples:
-        return
-    try:
-        all_s = np.vstack(adaptive_samples)
-        if all_s.shape[0] < adaptive_min_samples:
-            adaptive_samples = []
-            return
-        h = np.median(all_s[:, 0])
-        s_ = np.median(all_s[:, 1])
-        v = np.median(all_s[:, 2])
-        h_std = max(4.0, float(np.std(all_s[:, 0])))
-        s_std = max(20.0, float(np.std(all_s[:, 1])))
-        v_std = max(20.0, float(np.std(all_s[:, 2])))
-        tol_h = min(15, int(h_std * 2))
-        tol_s = min(100, int(s_std * 2))
-        tol_v = min(100, int(v_std * 2))
-        lo = np.array([max(int(h) - tol_h, 0), max(int(s_) - tol_s, 0), max(int(v) - tol_v, 0)], dtype=np.uint8)
-        up = np.array([min(int(h) + tol_h, 179), min(int(s_) + tol_s, 255), min(int(v) + tol_v, 255)], dtype=np.uint8)
-        adaptive_ranges = [(lo, up)]
-    except Exception:
-        pass
-    adaptive_samples = []
-
-
-def prune_tracks(frame_idx):
-    global tracks, primary_track_id
-    dead = [tid for tid, t in tracks.items() if t.miss > track_miss_limit]
-    for tid in dead:
-        del tracks[tid]
-    if primary_track_id is not None and primary_track_id not in tracks:
-        primary_track_id = None
-
-
-def match_and_update_tracks(candidates, frame_idx):
-    global tracks, next_track_id
-    for t in tracks.values():
-        t.kalman.predict()
-    used_tracks = set()
-    results = []
-    for ci, (cx, cy, area, contour) in enumerate(candidates):
-        best_tid = None
-        best_d2 = float("inf")
-        for tid, t in tracks.items():
-            if tid in used_tracks:
-                continue
-            px, py = t.kalman.pos()
-            d2 = (px - cx) ** 2 + (py - cy) ** 2
-            if d2 < best_d2 and d2 <= (roi_radius * 2) ** 2:
-                best_d2 = d2
-                best_tid = tid
-        if best_tid is not None:
-            t = tracks[best_tid]
-            t.kalman.update(cx, cy)
-            t.hits += 1
-            t.miss = 0
-            t.last_cx = cx
-            t.last_cy = cy
-            t.last_seen = frame_idx
-            t.confidence = min(1.0, t.confidence + 0.15)
-            used_tracks.add(best_tid)
-            results.append((t, ci, best_d2, area))
-        else:
-            if len(tracks) < max_tracks:
-                t = Track(next_track_id, cx, cy, frame_idx)
-                tracks[next_track_id] = t
-                used_tracks.add(next_track_id)
-                results.append((t, ci, 0.0, area))
-                next_track_id += 1
-            else:
-                results.append((None, ci, float("inf"), area))
-    for tid, t in tracks.items():
-        if tid not in used_tracks:
-            t.miss += 1
-            t.confidence = max(0.0, t.confidence - 0.08)
-    return results
-
-
-def score_candidate(track, cx, cy, area, primary_id, d2_to_crosshair):
-    area_n = min(1.0, area / float(max_area))
-    dist_n = 1.0 - min(1.0, (d2_to_crosshair**0.5) / max(1.0, float(fov_radius)))
-    stick_n = 1.0 if (primary_id is not None and track.id == primary_id) else 0.0
-    conf_n = track.confidence if track else 0.3
-    return w_area * area_n + max(w_dist, 0.05) * dist_n + w_stick * stick_n + 0.2 * conf_n
-
-
-pick_pixel_active = [False]
-pick_pixel_countdown = [0]
-
-
-def start_pick_pixel():
-    if pick_pixel_active[0]:
-        return
-    pick_pixel_active[0] = True
-    pick_pixel_countdown[0] = 3
-    pick_status_lbl.configure(text="Move mouse to marker...")
-    _pick_tick()
-
-
-def _pick_tick():
-    if not pick_pixel_active[0]:
-        return
-    n = pick_pixel_countdown[0]
-    if n > 0:
-        pick_status_lbl.configure(text=f"PICK in {n}...")
-        pick_pixel_countdown[0] = n - 1
-        root.after(1000, _pick_tick)
-    else:
-        _pick_capture()
-
-
-def _pick_capture():
-    pick_pixel_active[0] = False
-    try:
-        x, y = win32api.GetCursorPos()
-    except Exception:
-        pick_status_lbl.configure(text="cursor error")
-        return
-    try:
-        with mss.mss() as sct:
-            mon = {"top": int(y), "left": int(x), "width": 1, "height": 1}
-            img = np.array(sct.grab(mon))
-    except Exception as e:
-        pick_status_lbl.configure(text=f"grab error: {e}")
-        return
-
-    b = int(img[0, 0, 0])
-    g = int(img[0, 0, 1])
-    r = int(img[0, 0, 2])
-    hex_str = f"#{r:02X}{g:02X}{b:02X}"
-    pix = np.uint8([[[b, g, r]]])
-    hsv = cv2.cvtColor(pix, cv2.COLOR_BGR2HSV)[0, 0]
-    h = int(hsv[0])
-    s_ = int(hsv[1])
-    v = int(hsv[2])
-
-    hex_var.set(hex_str)
-    hex_var_pending = hex_str.upper()
-
-    tol_h_var.set(5)
-    tol_s_var.set(30)
-    tol_v_var.set(30)
-
-    new_s_floor = max(0, min(255, int(s_ * 0.85)))
-    new_v_floor = max(0, min(255, int(v * 0.85)))
-    s_floor_var.set(new_s_floor)
-    v_floor_var.set(new_v_floor)
-
-    global min_saturation_floor, min_value_floor
-    min_saturation_floor = new_s_floor
-    min_value_floor = new_v_floor
-
-    active_hexes.clear()
-    active_hexes.append(hex_var_pending)
-    rebuild_active_ranges_from_hexes()
-    update_swatch(swatch_canvas, hex_str)
-    update_params()
-
-    pick_status_lbl.configure(text=f"OK H={h} S={s_} V={v}")
-    try:
-        winsound.Beep(1400, 80)
-    except Exception:
-        pass
-
-
-def run_loop():
-    global running, prev_aim_state, ema_dx, ema_dy, sub_dx, sub_dy
-    global prev_err_x, prev_err_y, lock_cx, lock_cy, aim_enabled, lost_frames
-    global status_lock_hex, status_ranges, status_contours, status_target
-    global status_err, status_hit, status_loop_hz, aim_key, status_tracks
-    global status_ctx
-    global tracks, primary_track_id, last_switch_time
-    global adaptive_last_cycle, adaptive_samples, last_lock_cx, last_lock_cy, lock_velocity
-
-    running = True
-    if hasattr(mss, "MSS"):
-        s = mss.MSS()
-    else:
-        s = mss.mss()
-
-    t_last = time.time()
-    loop_count = 0
-    frame_idx = 0
-
-    while running:
-        time.sleep(0.001)
-        loop_count += 1
-        frame_idx += 1
-
-        now = time.time()
-        if now - t_last >= 0.5:
-            status_loop_hz = f"{loop_count / (now - t_last):.0f}"
-            loop_count = 0
-            t_last = now
-
-        status_ranges = str(len(active_ranges) + len(adaptive_ranges))
-        status_lock_hex = active_hexes[0] if active_hexes else "-"
-        status_tracks = str(len(tracks))
-
+def rizz_apply_lang_67():
+    for w, key, prop, up in skibidy_i18n_widgets_67:
         try:
-            GameFrame = np.array(s.grab(regionC))
+            txt = rizz_T_67(key)
+            if up:
+                txt = txt.upper()
+            w.configure(**{prop: txt})
         except Exception:
-            time.sleep(0.01)
-            continue
-
-        GameFrame = cv2.cvtColor(GameFrame, cv2.COLOR_BGRA2BGR)
-
-        aim_state = win32api.GetAsyncKeyState(aim_key)
-
-        tk_state = win32api.GetAsyncKeyState(0x77)
-        if tk_state < 0 and prev_aim_state >= 0:
-            aim_enabled = not aim_enabled
-            try:
-                winsound.Beep(1200 if aim_enabled else 800, 80)
-            except Exception:
-                pass
-        prev_aim_state = tk_state
-
-        if win32api.GetAsyncKeyState(0x6) < 0:
-            break
-
-        if not (aim_enabled and aim_state < 0):
-            if not aim_enabled:
-                status_target = "aim off (F8)"
-            else:
-                status_target = f"idle (hold {get_key_name(aim_key)})"
-            status_contours = "-"
-            status_hit = "-"
-            status_err = "-, -"
-            status_ctx = "-"
-            sub_dx *= 0.5
-            sub_dy *= 0.5
-            for t in list(tracks.values()):
-                t.miss += 3
-            prune_tracks(frame_idx)
-            continue
-
-        frame_hsv = cv2.cvtColor(GameFrame, cv2.COLOR_BGR2HSV)
-        mask = build_mask(frame_hsv)
-        mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel, iterations=1)
-        mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel, iterations=1)
-        mask = cv2.dilate(mask, kernel, iterations=1)
-        mask = cv2.medianBlur(mask, 5)
-
-        contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-        status_contours = str(len(contours))
-
-        if debug_mask_visible:
-            try:
-                cv2.imshow("mask", mask)
-                cv2.waitKey(1)
-            except Exception:
-                pass
-
-        if not contours:
-            lost_frames += 1
-            status_hit = "0"
-            status_ctx = "0"
-            status_target = "no contour"
-            if primary_track_id is not None and primary_track_id in tracks and lost_frames <= track_miss_limit:
-                t = tracks[primary_track_id]
-                px, py, vx, vy = t.kalman.predict()
-                lock_cx, lock_cy = px, py
-                lock_velocity = (vx, vy)
-            if lost_frames > lost_threshold:
-                prev_err_x = prev_err_y = 0.0
-                ema_dx = ema_dy = 0.0
-                sub_dx = sub_dy = 0.0
-            prune_tracks(frame_idx)
-            continue
-
-        raw_centroids = []
-        for c in contours:
-            a = cv2.contourArea(c)
-            if a < min_area or a > max_area:
-                continue
-            if not shape_ok(c, a):
-                continue
-            M = cv2.moments(c)
-            if M["m00"] == 0:
-                continue
-            cx_i = M["m10"] / M["m00"]
-            cy_i = M["m01"] / M["m00"]
-            if (cx_i - crosshairU) ** 2 + (cy_i - crosshairU) ** 2 <= fov_radius * fov_radius:
-                raw_centroids.append((cx_i, cy_i, a, c))
-
-        centroids = []
-        for cx_i, cy_i, a, c in raw_centroids:
-            if context_ok(frame_hsv, cx_i, cy_i):
-                centroids.append((cx_i, cy_i, a, c))
-        status_ctx = f"{len(centroids)}/{len(raw_centroids)}"
-
-        if not centroids:
-            lost_frames += 1
-            status_hit = "0"
-            status_target = "no candidate"
-            if primary_track_id is not None and primary_track_id in tracks and lost_frames <= track_miss_limit:
-                t = tracks[primary_track_id]
-                px, py, vx, vy = t.kalman.predict()
-                lock_cx, lock_cy = px, py
-                lock_velocity = (vx, vy)
-            if lost_frames > lost_threshold:
-                prev_err_x = prev_err_y = 0.0
-                ema_dx = ema_dy = 0.0
-                sub_dx = sub_dy = 0.0
-            prune_tracks(frame_idx)
-            continue
-
-        status_hit = str(len(centroids))
-        lost_frames = 0
-
-        matches = match_and_update_tracks(centroids, frame_idx)
-
-        scored = []
-        for t, ci, d2, area in matches:
-            if t is None:
-                continue
-            cx, cy, area2, c = centroids[ci]
-            d2c = (cx - crosshairU) ** 2 + (cy - crosshairU) ** 2
-            sc = score_candidate(t, cx, cy, area2, primary_track_id, d2c)
-            scored.append((sc, t, cx, cy, c))
-
-        if not scored:
-            prune_tracks(frame_idx)
-            continue
-
-        scored.sort(key=lambda x: -x[0])
-        best_sc, best_track, best_cx, best_cy, best_c = scored[0]
-
-        chosen_track = best_track
-        if primary_track_id is not None and primary_track_id in tracks:
-            current_sc = None
-            for sc, t, cx, cy, c in scored:
-                if t.id == primary_track_id:
-                    current_sc = sc
-                    break
-            if current_sc is not None:
-                if best_track.id != primary_track_id and best_sc <= current_sc * (1.0 + hysteresis_pct):
-                    chosen_track = tracks[primary_track_id]
-                    for sc, t, cx, cy, c in scored:
-                        if t.id == primary_track_id:
-                            best_cx, best_cy, best_c = cx, cy, c
-                            break
-                elif best_track.id != primary_track_id and (now - last_switch_time) * 1000.0 < switch_cooldown_ms:
-                    chosen_track = tracks[primary_track_id]
-                    for sc, t, cx, cy, c in scored:
-                        if t.id == primary_track_id:
-                            best_cx, best_cy, best_c = cx, cy, c
-                            break
-                elif best_track.id != primary_track_id:
-                    last_switch_time = now
-
-        primary_track_id = chosen_track.id
-
-        adaptive_sample_update(frame_hsv, best_c)
-        if adaptive_hsv_enabled and (frame_idx - adaptive_last_cycle) >= adaptive_cycle_frames:
-            adaptive_cycle_commit()
-            adaptive_last_cycle = frame_idx
-
-        vx, vy = chosen_track.kalman.vel()
-        lock_velocity = (vx, vy)
-        cx = best_cx + vx * float(lead_frames)
-        cy = best_cy + vy * float(lead_frames)
-
-        track_cx, track_cy = cx, cy
-        lock_cx, lock_cy = cx, cy
-        last_lock_cx, last_lock_cy = cx, cy
-
-        target_x = cx + offset_x
-        target_y = cy + offset_y
-
-        err_x = -(crosshairU - target_x)
-        err_y = -(crosshairU - target_y)
-
-        if abs(err_x) < deadzone_px:
-            err_x = 0.0
-        if abs(err_y) < deadzone_px:
-            err_y = 0.0
-
-        cross_x = np.sign(err_x) != np.sign(prev_err_x)
-        cross_y = np.sign(err_y) != np.sign(prev_err_y)
-        scale_x = np.tanh(abs(err_x) / 10.0)
-        scale_y = np.tanh(abs(err_y) / 10.0)
-
-        finalMult = finalComputerSensitivityMultiplier * lock_strength
-        dx_raw = (kp * err_x + kd * (err_x - prev_err_x)) * finalMult * scale_x
-        dy_raw = (kp * err_y + kd * (err_y - prev_err_y)) * finalMult * scale_y
-
-        if cross_x:
-            dx_raw *= 0.5
-            ema_dx = 0.0
-        if cross_y:
-            dy_raw *= 0.5
-            ema_dy = 0.0
-
-        dx_raw = float(np.clip(dx_raw, -max_step_px, max_step_px))
-        dy_raw = float(np.clip(dy_raw, -max_step_px, max_step_px))
-
-        ema_dx = (1 - smooth_alpha) * ema_dx + smooth_alpha * dx_raw
-        ema_dy = (1 - smooth_alpha) * ema_dy + smooth_alpha * dy_raw
-
-        sub_dx += ema_dx
-        sub_dy += ema_dy
-        move_x = int(sub_dx)
-        move_y = int(sub_dy)
-        sub_dx -= move_x
-        sub_dy -= move_y
-
-        if move_x or move_y:
-            win32api.mouse_event(win32con.MOUSEEVENTF_MOVE, move_x, move_y, 0, 0)
-
-        prev_err_x = err_x
-        prev_err_y = err_y
-
-        status_target = f"id{chosen_track.id} {int(cx)},{int(cy)}"
-        status_err = f"{err_x:+.1f}, {err_y:+.1f}"
-
-        prune_tracks(frame_idx)
-
+            pass
+    for menu, keys in rizz_i18n_menus_67:
+        try:
+            menu.configure(values=[rizz_T_67(k) for k in keys])
+        except Exception:
+            pass
     try:
-        cv2.destroyAllWindows()
+        skibidy_ch_style_var_67.set(rizz_T_67(f"ch_{sigma_ch_style_internal_67['v']}"))
+    except Exception:
+        pass
+    try:
+        if rizz_running_67:
+            skibidy_start_stop_btn_67.configure(text=rizz_T_67("btn_stop"))
+        else:
+            skibidy_start_stop_btn_67.configure(text=rizz_T_67("btn_start"))
+    except Exception:
+        pass
+    try:
+        sigma_lang_btn_67.configure(text=rizz_T_67("lang_btn"))
+    except Exception:
+        pass
+    try:
+        sigma_status_var_67.set(rizz_T_67("status_running") if rizz_running_67 else rizz_T_67("status_stopped"))
+    except Exception:
+        pass
+    try:
+        skibidy_switch_tab_67(sigma_active_tab_67["name"])
     except Exception:
         pass
 
+def sigma_toggle_lang_67():
+    global sigma_current_lang_67
+    sigma_current_lang_67 = "en" if sigma_current_lang_67 == "th" else "th"
+    rizz_apply_lang_67()
+    rizz_auto_save_67()
 
-def update_swatch(canvas, hex_str):
-    try:
-        canvas.delete("all")
-        w = int(canvas.cget("width"))
-        h = int(canvas.cget("height"))
-        canvas.create_rectangle(0, 0, w - 1, h - 1, fill=hex_str, outline="#000000")
-    except Exception:
-        pass
-
-
-def update_palette_canvas(cols):
-    try:
-        palette_canvas.delete("all")
-        h = int(palette_canvas.winfo_height() or 200)
-        n = max(1, len(cols))
-        bar_h = max(10, h // n)
-        for i, hx in enumerate(cols):
-            palette_canvas.create_rectangle(0, i * bar_h, 40, (i + 1) * bar_h, fill=hx, outline="")
-    except Exception:
-        pass
-
-
-def on_palette_select(event):
-    try:
-        sel = palette_list.curselection()
-        if sel:
-            update_swatch(swatch_canvas, palette_list.get(sel[-1]))
-    except Exception:
-        pass
-
-
-def on_palette_double_click(event):
-    try:
-        lb = event.widget
-        idx = lb.nearest(event.y)
-        s = lb.get(idx)
-        hex_var.set(s)
-        set_from_hex()
-    except Exception:
-        pass
-
-
-def run_worker():
-    global worker
-    if worker and worker.is_alive():
-        return
-    worker = threading.Thread(target=run_loop, daemon=True)
-    worker.start()
-    status_var.set("RUNNING")
-    top_status_var.set("RUNNING")
-
-
-def stop_worker():
-    global running
-    running = False
-    status_var.set("STOPPED")
-    top_status_var.set("STOPPED")
-    hide_overlay()
-
-
-def on_start():
-    root.update_idletasks()
-    ensure_overlay()
-    run_worker()
-
-
-def set_from_hex():
-    s = hex_var.get()
-    r = range_from_hex(s, tol_h_var.get(), tol_s_var.get(), tol_v_var.get(), with_floor=True)
-    if r:
-        active_hexes.clear()
-        active_hexes.append(s.upper())
-        rebuild_active_ranges_from_hexes()
-        update_swatch(swatch_canvas, s)
-
-
-def choose_image():
-    p = filedialog.askopenfilename(filetypes=[("Image", "*.png;*.jpg;*.jpeg;*.bmp")])
-    if not p:
-        return
-    cols = analyze_image_colors(p, k=5)
-    palette_list.delete(0, tk.END)
-    for hx in cols:
-        palette_list.insert(tk.END, hx)
-    update_palette_canvas(cols)
-
-
-def lock_selected_colors():
-    sel = palette_list.curselection()
-    if not sel:
-        return
-    chosen = []
-    for i in sel:
-        hx = palette_list.get(i).upper()
-        if color_is_marker_grade(hx):
-            chosen.append(hx)
-    if not chosen:
-        chosen = [palette_list.get(i).upper() for i in sel]
-    active_hexes.clear()
-    active_hexes.extend(chosen)
-    rebuild_active_ranges_from_hexes()
-    if chosen:
-        update_swatch(swatch_canvas, chosen[-1])
-
-
-def auto_detect_colors_from_folder():
-    cols = analyze_folder_colors("images", k=8)
-    if not cols:
-        return
-    filtered = [c for c in cols if color_is_marker_grade(c)]
-    if not filtered:
-        filtered = cols[:1]
-    palette_list.delete(0, tk.END)
-    for hx in filtered:
-        palette_list.insert(tk.END, hx)
-    update_palette_canvas(filtered)
-
-
-def update_params(*args):
-    global lock_strength, smooth_alpha, max_step_px, deadzone_px, fov_radius
-    global offset_x, offset_y
-    global robloxSensitivity, PF_MouseSensitivity, PF_AimSensitivity
-    global PF_sensitivity, finalComputerSensitivityMultiplier
-    global lead_frames, w_area, w_dist, w_stick, switch_cooldown_ms, hysteresis_pct
-    global shape_filter_enabled, adaptive_hsv_enabled, adaptive_ranges
-    global context_check_enabled, context_radius, context_ratio_pct
-    global min_saturation_floor, min_value_floor
-
-    lock_strength = round_to_2(strength_var.get())
-    smooth_alpha = max(0.01, 1.0 - round_to_2(stability_var.get()))
-    max_step_px = int(max_step_var.get())
-    deadzone_px = int(deadzone_var.get())
-    fov_radius = int(fov_var.get())
-    offset_x = int(offset_x_var.get())
-    offset_y = int(offset_y_var.get())
-
-    robloxSensitivity = roblox_sens_var.get()
-    PF_MouseSensitivity = pf_mouse_var.get()
-    PF_AimSensitivity = pf_aim_var.get()
-    PF_sensitivity = PF_MouseSensitivity * PF_AimSensitivity
-    finalComputerSensitivityMultiplier = ((robloxSensitivity * PF_sensitivity) / 0.55) + movementCompensation
-
-    lead_frames = float(lead_var.get())
-    w_area = float(w_area_var.get())
-    w_dist = float(w_dist_var.get())
-    w_stick = float(w_stick_var.get())
-    switch_cooldown_ms = int(cooldown_var.get())
-    hysteresis_pct = float(hyst_var.get()) / 100.0
-
-    shape_filter_enabled = bool(shape_filter_var.get())
-    new_adaptive = bool(adaptive_var.get())
-    if new_adaptive != adaptive_hsv_enabled:
-        adaptive_hsv_enabled = new_adaptive
-        if not adaptive_hsv_enabled:
-            adaptive_ranges = []
-
-    context_check_enabled = bool(context_var.get())
-    context_radius = int(context_radius_var.get())
-    context_ratio_pct = int(context_ratio_var.get())
-
-    min_saturation_floor = int(s_floor_var.get())
-    min_value_floor = int(v_floor_var.get())
-
-    rebuild_active_ranges_from_hexes()
-    update_overlay()
-
-
-def startup_image_scan():
-    auto_detect_colors_from_folder()
-    if not active_hexes:
-        set_from_hex()
-
-
-COLORKEY_HEX = "#010203"
-COLORKEY_REF = 0x030201
-
-
-def _apply_click_through(hwnd, colorkey_ref):
-    ex = win32gui.GetWindowLong(hwnd, win32con.GWL_EXSTYLE)
-    ex |= win32con.WS_EX_LAYERED | win32con.WS_EX_TRANSPARENT | win32con.WS_EX_NOACTIVATE | 0x00000080
-    win32gui.SetWindowLong(hwnd, win32con.GWL_EXSTYLE, ex)
-    win32gui.SetLayeredWindowAttributes(hwnd, colorkey_ref, 0, win32con.LWA_COLORKEY)
-
-
-def _make_overlay():
-    global overlay, overlay_canvas
-    overlay = tk.Toplevel(root)
-    overlay.overrideredirect(True)
-    overlay.attributes("-topmost", True)
-    try:
-        overlay.attributes("-toolwindow", True)
-    except Exception:
-        pass
-
-    transparent_ok = False
-    try:
-        overlay.attributes("-transparentcolor", COLORKEY_HEX)
-        overlay.configure(bg=COLORKEY_HEX)
-        transparent_ok = True
-    except Exception:
-        overlay.configure(bg="black")
-
-    overlay_canvas = tk.Canvas(overlay, highlightthickness=0, bd=0, bg=COLORKEY_HEX if transparent_ok else "black")
-    overlay_canvas.pack(fill="both", expand=True)
-
-    overlay.update_idletasks()
-    overlay.deiconify()
-    overlay.update_idletasks()
-    overlay.update()
-
-    try:
-        hwnd = win32gui.GetParent(overlay.winfo_id())
-        if hwnd == 0:
-            hwnd = overlay.winfo_id()
-        _apply_click_through(hwnd, COLORKEY_REF)
-    except Exception:
-        pass
-
-    overlay.withdraw()
-
-
-def ensure_overlay():
-    global overlay
-    if not show_fov_var.get() and not show_dot_var.get():
-        hide_overlay()
-        return
-    if overlay is None or not overlay.winfo_exists():
-        _make_overlay()
-    update_overlay()
-
-
-def update_overlay():
-    global overlay, overlay_canvas
-    if overlay is None or not overlay.winfo_exists():
-        return
-    show_fov = bool(show_fov_var.get())
-    show_dot = bool(show_dot_var.get())
-    if not show_fov and not show_dot:
-        hide_overlay()
-        return
-
-    r = int(fov_var.get())
-    d = 2 * r + 6
-    x = config.center_x - d // 2
-    y = config.center_y - d // 2
-
-    overlay.geometry(f"{d}x{d}+{x}+{y}")
-    overlay.deiconify()
-    overlay.lift()
-    overlay.attributes("-topmost", True)
-
-    try:
-        hwnd = win32gui.GetParent(overlay.winfo_id())
-        if hwnd == 0:
-            hwnd = overlay.winfo_id()
-        _apply_click_through(hwnd, COLORKEY_REF)
-    except Exception:
-        pass
-
-    overlay_canvas.delete("all")
-    if show_fov:
-        overlay_canvas.create_oval(3, 3, d - 3, d - 3, outline="#E94560", width=2)
-    if show_dot:
-        cx = d // 2
-        cy = d // 2
-        overlay_canvas.create_oval(cx - 2, cy - 2, cx + 2, cy + 2, fill="#39D98A", outline="")
-        overlay_canvas.create_line(cx - 9, cy, cx - 3, cy, fill="#39D98A", width=1)
-        overlay_canvas.create_line(cx + 3, cy, cx + 9, cy, fill="#39D98A", width=1)
-        overlay_canvas.create_line(cx, cy - 9, cx, cy - 3, fill="#39D98A", width=1)
-        overlay_canvas.create_line(cx, cy + 3, cx, cy + 9, fill="#39D98A", width=1)
-
-
-def hide_overlay():
-    global overlay
-    try:
-        if overlay and overlay.winfo_exists():
-            overlay.withdraw()
-    except Exception:
-        pass
-
-
-BG_ROOT = "#0E0E10"
-BG_PANEL = "#16161A"
-BG_PANEL_2 = "#1C1C22"
-BG_INPUT = "#20202A"
-ACCENT = "#E94560"
-ACCENT_DIM = "#8A2A3A"
-OK_GREEN = "#39D98A"
-TXT = "#E0E0E0"
-TXT_DIM = "#7A7A82"
-BORDER = "#2A2A32"
+RIZZ_BG_DARK_67      = "#0d0d0d"
+SKIBIDY_BG_SIDEBAR_67 = "#111111"
+SIGMA_BG_PANEL_67    = "#151515"
+RIZZ_BG_CARD_67      = "#1a1a1a"
+SKIBIDY_BG_INPUT_67   = "#202020"
+SIGMA_TITLEBAR_BG_67 = "#282828"
+RIZZ_PRIMARY_67      = "#2a2a2a"
+SKIBIDY_PRIMARY_HOV_67 = "#3a3a3a"
+SIGMA_ACCENT_67      = "#2c5cff"
+RIZZ_ACCENT_HOV_67   = "#4a75ff"
+SKIBIDY_ACCENT_DIM_67 = "#1e3f9c"
+SIGMA_DANGER_67      = "#c9304a"
+RIZZ_DANGER_HOV_67   = "#e04a63"
+SKIBIDY_TEXT_LIGHT_67 = "#e6e6e6"
+SIGMA_TEXT_DIM_67    = "#7a7a7a"
+RIZZ_BORDER_67       = "#242424"
 
 customtkinter.set_appearance_mode("Dark")
 customtkinter.set_default_color_theme("dark-blue")
 
-MONO = ("Consolas", 11)
-MONO_B = ("Consolas", 11, "bold")
-MONO_L = ("Consolas", 13, "bold")
-MONO_S = ("Consolas", 10)
+SKIBIDY_WIN_W_67 = 780
+RIZZ_WIN_H_67 = 560
+SIGMA_SIDEBAR_W_67 = 160
 
-root = customtkinter.CTk()
-root.title("Color aimbot")
-root.geometry("840x700")
-root.resizable(False, False)
-root.configure(fg_color=BG_ROOT)
+rizz_root_67 = customtkinter.CTk()
+rizz_root_67.title("Aimzen")
+rizz_root_67.geometry(f"{SKIBIDY_WIN_W_67}x{RIZZ_WIN_H_67}")
+rizz_root_67.resizable(False, False)
+rizz_root_67.configure(fg_color=RIZZ_BG_DARK_67)
+sigma_icon_path_67 = os.path.join(SKIBIDY_CONFIGS_DIR_67, "configs/icon.ico")
+if os.path.exists(sigma_icon_path_67):
+    try:
+        rizz_root_67.iconbitmap(sigma_icon_path_67)
+    except Exception as e:
+        print(f"ไม่สามารถโหลด icon ได้: {e}")
 
-hex_var = customtkinter.StringVar(value="#FDFCB3")
-tol_h_var = customtkinter.IntVar(value=8)
-tol_s_var = customtkinter.IntVar(value=40)
-tol_v_var = customtkinter.IntVar(value=40)
-s_floor_var = customtkinter.IntVar(value=min_saturation_floor)
-v_floor_var = customtkinter.IntVar(value=min_value_floor)
-strength_var = customtkinter.DoubleVar(value=1.5)
-stability_var = customtkinter.DoubleVar(value=0.35)
-pf_mouse_var = customtkinter.DoubleVar(value=PF_MouseSensitivity)
-pf_aim_var = customtkinter.DoubleVar(value=PF_AimSensitivity)
-roblox_sens_var = customtkinter.DoubleVar(value=robloxSensitivity)
-max_step_var = customtkinter.IntVar(value=max_step_px)
-deadzone_var = customtkinter.IntVar(value=deadzone_px)
-fov_var = customtkinter.IntVar(value=fov_radius)
-offset_x_var = customtkinter.IntVar(value=0)
-offset_y_var = customtkinter.IntVar(value=-2)
-show_fov_var = customtkinter.BooleanVar(value=True)
-show_dot_var = customtkinter.BooleanVar(value=False)
-status_var = customtkinter.StringVar(value="STOPPED")
-top_status_var = customtkinter.StringVar(value="STOPPED")
+skibidy_hex_var_67 = customtkinter.StringVar(value="#feffb2")
+rizz_tol_h_var_67 = customtkinter.IntVar(value=10)
+sigma_tol_s_var_67 = customtkinter.IntVar(value=60)
+skibidy_tol_v_var_67 = customtkinter.IntVar(value=60)
+rizz_strength_var_67 = customtkinter.DoubleVar(value=1.0)
+sigma_stability_var_67 = customtkinter.DoubleVar(value=0.82)
+skibidy_pf_mouse_var_67 = customtkinter.DoubleVar(value=0.5)
+rizz_pf_aim_var_67 = customtkinter.DoubleVar(value=1.0)
+sigma_roblox_sens_var_67 = customtkinter.DoubleVar(value=0.55)
+skibidy_max_step_var_67 = customtkinter.IntVar(value=6)
+rizz_deadzone_var_67 = customtkinter.IntVar(value=6)
+sigma_fov_var_67 = customtkinter.IntVar(value=80)
+skibidy_offset_x_var_67 = customtkinter.IntVar(value=0)
+rizz_offset_y_var_67 = customtkinter.IntVar(value=0)
+sigma_show_fov_var_67 = customtkinter.BooleanVar(value=False)
+skibidy_show_crosshair_var_67 = customtkinter.BooleanVar(value=False)
+rizz_exclude_capture_var_67 = customtkinter.BooleanVar(value=False)
+sigma_status_var_67 = customtkinter.StringVar(value="Stopped")
+skibidy_folder_var_67 = customtkinter.StringVar(value="images")
+rizz_skip_dark_var_67 = customtkinter.BooleanVar(value=True)
+sigma_skip_gray_var_67 = customtkinter.BooleanVar(value=True)
+skibidy_selected_palette_index_67 = customtkinter.IntVar(value=-1)
+rizz_config_name_var_67 = customtkinter.StringVar(value="")
 
-lead_var = customtkinter.DoubleVar(value=lead_frames)
-w_area_var = customtkinter.DoubleVar(value=w_area)
-w_dist_var = customtkinter.DoubleVar(value=w_dist)
-w_stick_var = customtkinter.DoubleVar(value=w_stick)
-cooldown_var = customtkinter.IntVar(value=switch_cooldown_ms)
-hyst_var = customtkinter.IntVar(value=int(hysteresis_pct * 100))
-shape_filter_var = customtkinter.BooleanVar(value=shape_filter_enabled)
-adaptive_var = customtkinter.BooleanVar(value=adaptive_hsv_enabled)
+sigma_ov_show_box_var_67 = customtkinter.BooleanVar(value=True)
+skibidy_ov_show_fps_var_67 = customtkinter.BooleanVar(value=True)
+rizz_ov_show_aim_line_var_67 = customtkinter.BooleanVar(value=False)
+sigma_ov_hide_idle_var_67 = customtkinter.BooleanVar(value=False)
+skibidy_ov_rainbow_var_67 = customtkinter.BooleanVar(value=False)
+rizz_ov_color_var_67 = customtkinter.StringVar(value="#ff4040")
 
-context_var = customtkinter.BooleanVar(value=context_check_enabled)
-context_radius_var = customtkinter.IntVar(value=context_radius)
-context_ratio_var = customtkinter.IntVar(value=context_ratio_pct)
+sigma_verify_enable_var_67 = customtkinter.BooleanVar(value=rizz_verify_enabled_67)
+skibidy_verify_hexes_var_67 = customtkinter.StringVar(value=", ".join(sigma_verify_hex_list_67))
+rizz_verify_tol_h_var_67 = customtkinter.IntVar(value=skibidy_verify_tol_h_67)
+sigma_verify_tol_s_var_67 = customtkinter.IntVar(value=rizz_verify_tol_s_67)
+skibidy_verify_tol_v_var_67 = customtkinter.IntVar(value=sigma_verify_tol_v_67)
+rizz_verify_roi_var_67 = customtkinter.IntVar(value=skibidy_verify_roi_67)
+sigma_verify_minpx_var_67 = customtkinter.IntVar(value=rizz_verify_min_px_67)
+skibidy_verify_frames_var_67 = customtkinter.IntVar(value=sigma_verify_frames_required_67)
 
-aim_key_var = customtkinter.IntVar(value=0x10)
-aim_key_display_var = customtkinter.StringVar(value="Left Shift")
+rizz_movement_compensation_var_67 = customtkinter.DoubleVar(value=sigma_movement_compensation_67)
+sigma_kp_var_67 = customtkinter.DoubleVar(value=sigma_kp_67)
+skibidy_kd_var_67 = customtkinter.DoubleVar(value=skibidy_kd_67)
+rizz_roi_radius_var_67 = customtkinter.IntVar(value=sigma_roi_radius_67)
 
-live_hex_var = customtkinter.StringVar(value="-")
-live_ranges_var = customtkinter.StringVar(value="0")
-live_contours_var = customtkinter.StringVar(value="-")
-live_target_var = customtkinter.StringVar(value="-")
-live_err_var = customtkinter.StringVar(value="-, -")
-live_hit_var = customtkinter.StringVar(value="-")
-live_hz_var = customtkinter.StringVar(value="0")
-live_tracks_var = customtkinter.StringVar(value="0")
-live_ctx_var = customtkinter.StringVar(value="-")
+SIGMA_CROSSHAIR_STYLES_67 = ["dot", "cross", "circle", "t_cross",
+                              "x_cross", "chevron", "dot_circle", "brackets"]
+sigma_ch_style_internal_67 = {"v": "cross"}
+skibidy_ch_style_var_67 = customtkinter.StringVar(value=rizz_T_67("ch_cross"))
+rizz_ch_size_var_67 = customtkinter.IntVar(value=12)
 
-strength_display_var = customtkinter.StringVar(value=format_value(strength_var.get()))
-stability_display_var = customtkinter.StringVar(value=format_value(stability_var.get()))
-pf_mouse_display_var = customtkinter.StringVar(value=format_value(pf_mouse_var.get()))
-pf_aim_display_var = customtkinter.StringVar(value=format_value(pf_aim_var.get()))
-roblox_display_var = customtkinter.StringVar(value=format_value(roblox_sens_var.get()))
-max_step_display_var = customtkinter.StringVar(value=str(int(max_step_var.get())))
-deadzone_display_var = customtkinter.StringVar(value=str(int(deadzone_var.get())))
-fov_display_var = customtkinter.StringVar(value=str(int(fov_var.get())))
-offset_x_display_var = customtkinter.StringVar(value=str(int(offset_x_var.get())))
-offset_y_display_var = customtkinter.StringVar(value=str(int(offset_y_var.get())))
-lead_display_var = customtkinter.StringVar(value=format_value(lead_var.get()))
-w_area_display_var = customtkinter.StringVar(value=format_value(w_area_var.get()))
-w_dist_display_var = customtkinter.StringVar(value=format_value(w_dist_var.get()))
-w_stick_display_var = customtkinter.StringVar(value=format_value(w_stick_var.get()))
-cooldown_display_var = customtkinter.StringVar(value=str(int(cooldown_var.get())))
-hyst_display_var = customtkinter.StringVar(value=str(int(hyst_var.get())))
-ctx_radius_display_var = customtkinter.StringVar(value=str(int(context_radius_var.get())))
-ctx_ratio_display_var = customtkinter.StringVar(value=str(int(context_ratio_var.get())))
-s_floor_display_var = customtkinter.StringVar(value=str(int(s_floor_var.get())))
-v_floor_display_var = customtkinter.StringVar(value=str(int(v_floor_var.get())))
+skibidy_strength_display_67 = customtkinter.StringVar(value=f"{rizz_strength_var_67.get():.2f}")
+rizz_stability_display_67 = customtkinter.StringVar(value=f"{sigma_stability_var_67.get():.2f}")
+sigma_pf_mouse_display_67 = customtkinter.StringVar(value=f"{skibidy_pf_mouse_var_67.get():.2f}")
+skibidy_pf_aim_display_67 = customtkinter.StringVar(value=f"{rizz_pf_aim_var_67.get():.2f}")
+rizz_roblox_display_67 = customtkinter.StringVar(value=f"{sigma_roblox_sens_var_67.get():.2f}")
+sigma_max_step_display_67 = customtkinter.StringVar(value=str(int(skibidy_max_step_var_67.get())))
+skibidy_deadzone_display_67 = customtkinter.StringVar(value=str(int(rizz_deadzone_var_67.get())))
+rizz_fov_display_67 = customtkinter.StringVar(value=str(int(sigma_fov_var_67.get())))
+sigma_offset_x_display_67 = customtkinter.StringVar(value=str(int(skibidy_offset_x_var_67.get())))
+skibidy_offset_y_display_67 = customtkinter.StringVar(value=str(int(rizz_offset_y_var_67.get())))
+rizz_tol_h_display_67 = customtkinter.StringVar(value=str(int(rizz_tol_h_var_67.get())))
+sigma_tol_s_display_67 = customtkinter.StringVar(value=str(int(sigma_tol_s_var_67.get())))
+skibidy_tol_v_display_67 = customtkinter.StringVar(value=str(int(skibidy_tol_v_var_67.get())))
+rizz_movement_display_67 = customtkinter.StringVar(value=f"{rizz_movement_compensation_var_67.get():.2f}")
+sigma_kp_display_67 = customtkinter.StringVar(value=f"{sigma_kp_var_67.get():.2f}")
+skibidy_kd_display_67 = customtkinter.StringVar(value=f"{skibidy_kd_var_67.get():.2f}")
+rizz_roi_radius_display_67 = customtkinter.StringVar(value=str(int(rizz_roi_radius_var_67.get())))
+sigma_ch_size_display_67 = customtkinter.StringVar(value=str(int(rizz_ch_size_var_67.get())))
 
+skibidy_value_labels_67 = {}
 
-def _bind_display(var, disp, fmt=".2f"):
-    def _upd(*_):
+def sigma_round_to_2_67(value):
+    return round(float(value), 2)
+
+def skibidy_format_value_67(value, digits=2):
+    return f"{sigma_round_to_2_67(value):.{digits}f}"
+
+def rizz_update_swatch_67(canvas, hex_str):
+    try:
+        canvas.delete("all")
+        canvas.create_rectangle(0, 0, 60, 26, fill=hex_str, outline="#000000")
+    except Exception:
+        pass
+
+def sigma_find_scrollable_67(w):
+    while w is not None:
+        if isinstance(w, customtkinter.CTkScrollableFrame):
+            return w
+        w = getattr(w, "master", None)
+    return None
+
+def skibidy_neutralize_slider_wheel_67(slider, scrollable):
+    if scrollable is None:
+        return
+    def wheel(event):
         try:
-            if fmt == "d":
-                disp.set(str(int(var.get())))
-            else:
-                disp.set(format(float(var.get()), fmt))
+            scrollable._parent_canvas.yview_scroll(int(-event.delta / 120), "units")
+        except Exception:
+            pass
+        return "break"
+    for attr in ("_canvas", "_button"):
+        try:
+            child = getattr(slider, attr, None)
+            if child is None:
+                continue
+            child.unbind("<MouseWheel>")
+            child.bind("<MouseWheel>", wheel)
         except Exception:
             pass
 
-    var.trace_add("write", _upd)
-    _upd()
-
-
-_bind_display(strength_var, strength_display_var, ".2f")
-_bind_display(stability_var, stability_display_var, ".2f")
-_bind_display(pf_mouse_var, pf_mouse_display_var, ".2f")
-_bind_display(pf_aim_var, pf_aim_display_var, ".2f")
-_bind_display(roblox_sens_var, roblox_display_var, ".2f")
-_bind_display(max_step_var, max_step_display_var, "d")
-_bind_display(deadzone_var, deadzone_display_var, "d")
-_bind_display(fov_var, fov_display_var, "d")
-_bind_display(offset_x_var, offset_x_display_var, "d")
-_bind_display(offset_y_var, offset_y_display_var, "d")
-_bind_display(lead_var, lead_display_var, ".2f")
-_bind_display(w_area_var, w_area_display_var, ".2f")
-_bind_display(w_dist_var, w_dist_display_var, ".2f")
-_bind_display(w_stick_var, w_stick_display_var, ".2f")
-_bind_display(cooldown_var, cooldown_display_var, "d")
-_bind_display(hyst_var, hyst_display_var, "d")
-_bind_display(context_radius_var, ctx_radius_display_var, "d")
-_bind_display(context_ratio_var, ctx_ratio_display_var, "d")
-_bind_display(s_floor_var, s_floor_display_var, "d")
-_bind_display(v_floor_var, v_floor_display_var, "d")
-
-topbar = customtkinter.CTkFrame(root, fg_color=BG_PANEL, height=34, corner_radius=0)
-topbar.pack(fill="x", side="top")
-topbar.pack_propagate(False)
-
-top_status_lbl = customtkinter.CTkLabel(topbar, textvariable=top_status_var, font=MONO_L, text_color=TXT_DIM)
-top_status_lbl.pack(side="left", padx=12)
-
-customtkinter.CTkLabel(topbar, textvariable=live_hz_var, font=MONO_S, text_color=TXT_DIM).pack(side="right", padx=(0, 4))
-customtkinter.CTkLabel(topbar, text="hz", font=MONO_S, text_color=TXT_DIM).pack(side="right")
-customtkinter.CTkLabel(topbar, text="|", font=MONO_S, text_color=BORDER).pack(side="right", padx=8)
-customtkinter.CTkLabel(topbar, textvariable=live_hex_var, font=MONO_B, text_color=ACCENT).pack(side="right")
-
-body = customtkinter.CTkFrame(root, fg_color=BG_ROOT, corner_radius=0)
-body.pack(fill="both", expand=True, padx=6, pady=6)
-
-sidebar = customtkinter.CTkFrame(body, fg_color=BG_PANEL, width=210, corner_radius=6)
-sidebar.pack(side="left", fill="y", padx=(0, 6))
-sidebar.pack_propagate(False)
-
-sb_actions = customtkinter.CTkFrame(sidebar, fg_color=BG_PANEL_2, corner_radius=4)
-sb_actions.pack(fill="x", padx=5, pady=(5, 4))
-
-customtkinter.CTkButton(sb_actions, text="START", command=on_start, fg_color=OK_GREEN, hover_color="#2BB070", text_color="#000000", font=MONO_B, height=28).pack(fill="x", padx=5, pady=(5, 3))
-
-customtkinter.CTkButton(sb_actions, text="STOP", command=stop_worker, fg_color=ACCENT, hover_color=ACCENT_DIM, text_color="#FFFFFF", font=MONO_B, height=28).pack(fill="x", padx=5, pady=(0, 5))
-
-sb_live = customtkinter.CTkFrame(sidebar, fg_color=BG_PANEL_2, corner_radius=4)
-sb_live.pack(fill="x", padx=5, pady=4)
-sb_live.grid_columnconfigure(1, weight=1)
-
-customtkinter.CTkLabel(sb_live, text="LOCK STATUS", font=MONO_B, text_color=ACCENT).grid(row=0, column=0, columnspan=2, sticky="w", padx=9, pady=(6, 3))
-
-live_swatch = tk.Canvas(sb_live, width=190, height=6, highlightthickness=0, bg=BG_PANEL_2)
-live_swatch.grid(row=1, column=0, columnspan=2, sticky="ew", padx=9, pady=(0, 6))
-
-
-def live_row(parent, r_i, label, var):
-    customtkinter.CTkLabel(parent, text=label, font=MONO_S, text_color=TXT_DIM, anchor="w").grid(row=r_i, column=0, sticky="w", padx=(9, 5), pady=1)
-    customtkinter.CTkLabel(parent, textvariable=var, font=MONO_S, text_color=TXT, anchor="e").grid(row=r_i, column=1, sticky="e", padx=(5, 9), pady=1)
-
-
-live_row(sb_live, 2, "hex", live_hex_var)
-live_row(sb_live, 3, "ranges", live_ranges_var)
-live_row(sb_live, 4, "contours", live_contours_var)
-live_row(sb_live, 5, "raw/ctx", live_ctx_var)
-live_row(sb_live, 6, "candidates", live_hit_var)
-live_row(sb_live, 7, "tracks", live_tracks_var)
-live_row(sb_live, 8, "target", live_target_var)
-live_row(sb_live, 9, "err", live_err_var)
-
-customtkinter.CTkFrame(sb_live, fg_color="transparent", height=4).grid(row=10, column=0, columnspan=2)
-
-sb_vis = customtkinter.CTkFrame(sidebar, fg_color=BG_PANEL_2, corner_radius=4)
-sb_vis.pack(fill="x", padx=5, pady=4)
-
-customtkinter.CTkCheckBox(sb_vis, text=" FOV overlay", variable=show_fov_var, command=ensure_overlay, fg_color=ACCENT, hover_color=ACCENT_DIM, font=MONO_S, text_color=TXT, border_color=BORDER, checkmark_color="#FFFFFF").pack(anchor="w", padx=9, pady=(6, 3))
-
-customtkinter.CTkCheckBox(sb_vis, text=" CENTER DOT", variable=show_dot_var, command=ensure_overlay, fg_color=ACCENT, hover_color=ACCENT_DIM, font=MONO_S, text_color=TXT, border_color=BORDER, checkmark_color="#FFFFFF").pack(anchor="w", padx=9, pady=(0, 6))
-
-sb_footer = customtkinter.CTkFrame(sidebar, fg_color="transparent")
-sb_footer.pack(side="bottom", fill="x", padx=5, pady=5)
-customtkinter.CTkLabel(sb_footer, text="F8 toggle | END exit", font=MONO_S, text_color=TXT_DIM).pack()
-
-tabs_frame = customtkinter.CTkFrame(body, fg_color=BG_PANEL, corner_radius=6)
-tabs_frame.pack(side="left", fill="both", expand=True)
-
-tabview = customtkinter.CTkTabview(tabs_frame, fg_color=BG_PANEL, segmented_button_fg_color=BG_PANEL_2, segmented_button_selected_color=ACCENT, segmented_button_selected_hover_color=ACCENT_DIM, segmented_button_unselected_color=BG_PANEL_2, segmented_button_unselected_hover_color=BG_INPUT, text_color=TXT, border_color=BORDER, border_width=1, corner_radius=6)
-tabview.pack(fill="both", expand=True, padx=5, pady=5)
-
-tab_aim = tabview.add("AIMBOT")
-tab_track = tabview.add("TRACKING")
-tab_color = tabview.add("COLOR")
-tab_visual = tabview.add("VISUAL")
-tab_config = tabview.add("CONFIG")
-
-for tab in (tab_aim, tab_track, tab_color, tab_visual, tab_config):
-    tab.configure(fg_color=BG_PANEL)
-
-
-def make_slider(parent, label, var, frm, to, display_var=None, step=None, label_w=150):
-    f = customtkinter.CTkFrame(parent, fg_color=BG_PANEL_2, corner_radius=4, height=30)
-    f.pack(fill="x", padx=6, pady=2)
-    f.pack_propagate(False)
-    customtkinter.CTkLabel(f, text=label, font=MONO_B, text_color=TXT, width=label_w, anchor="w").pack(side="left", padx=(9, 5))
-    kwargs = dict(variable=var, command=update_params, button_color=ACCENT, button_hover_color=ACCENT_DIM, progress_color=ACCENT, fg_color=BG_INPUT, height=12)
-    if step is not None:
-        kwargs["number_of_steps"] = step
-    customtkinter.CTkSlider(f, from_=frm, to=to, **kwargs).pack(side="left", fill="x", expand=True, padx=2)
-    if display_var is not None:
-        customtkinter.CTkLabel(f, textvariable=display_var, font=MONO_S, text_color=ACCENT, width=45, anchor="e").pack(side="right", padx=(5, 9))
-
-
-make_slider(tab_aim, "LOCK STRENGTH", strength_var, 0.5, 3.0, strength_display_var, step=100)
-make_slider(tab_aim, "SMOOTHNESS", stability_var, 0.05, 1.00, stability_display_var, step=100)
-make_slider(tab_aim, "AIM SPEED (px/frame)", max_step_var, 1, 20, max_step_display_var, step=19)
-make_slider(tab_aim, "AIM DEADZONE (px)", deadzone_var, 0, 15, deadzone_display_var, step=15)
-make_slider(tab_aim, "FOV RADIUS", fov_var, 30, 140, fov_display_var, step=110)
-make_slider(tab_aim, "OFFSET X", offset_x_var, -100, 100, offset_x_display_var, step=200)
-make_slider(tab_aim, "OFFSET Y", offset_y_var, -100, 100, offset_y_display_var, step=200)
-
-make_slider(tab_track, "LEAD (frames)", lead_var, 0.0, 10.0, lead_display_var, step=100)
-make_slider(tab_track, "WEIGHT AREA", w_area_var, 0.0, 1.0, w_area_display_var, step=100)
-make_slider(tab_track, "WEIGHT DISTANCE", w_dist_var, 0.0, 1.0, w_dist_display_var, step=100)
-make_slider(tab_track, "WEIGHT STICKY", w_stick_var, 0.0, 1.0, w_stick_display_var, step=100)
-make_slider(tab_track, "SWITCH COOLDOWN (ms)", cooldown_var, 0, 500, cooldown_display_var, step=50)
-make_slider(tab_track, "HYSTERESIS (%)", hyst_var, 0, 60, hyst_display_var, step=60)
-
-ttl_vis = customtkinter.CTkFrame(tab_track, fg_color=BG_PANEL_2, corner_radius=4)
-ttl_vis.pack(fill="x", padx=6, pady=(4, 3))
-customtkinter.CTkLabel(ttl_vis, text="FILTERS", font=MONO_B, text_color=ACCENT).pack(anchor="w", padx=10, pady=(5, 3))
-customtkinter.CTkCheckBox(ttl_vis, text=" SHAPE FILTER (aspect/solidity/extent)", variable=shape_filter_var, command=update_params, fg_color=ACCENT, hover_color=ACCENT_DIM, font=MONO_S, text_color=TXT, border_color=BORDER, checkmark_color="#FFFFFF").pack(anchor="w", padx=10, pady=(0, 6))
-
-ctx_block = customtkinter.CTkFrame(tab_track, fg_color=BG_PANEL_2, corner_radius=4)
-ctx_block.pack(fill="x", padx=6, pady=(3, 6))
-customtkinter.CTkLabel(ctx_block, text="CONTEXT FILTER", font=MONO_B, text_color=ACCENT).pack(anchor="w", padx=10, pady=(5, 3))
-customtkinter.CTkLabel(ctx_block, text="Ring around candidate: cyan (outline) or dark (silhouette).", font=MONO_S, text_color=TXT_DIM, justify="left").pack(anchor="w", padx=10, pady=(0, 5))
-customtkinter.CTkCheckBox(ctx_block, text=" ENABLE CONTEXT VERIFY", variable=context_var, command=update_params, fg_color=ACCENT, hover_color=ACCENT_DIM, font=MONO_S, text_color=TXT, border_color=BORDER, checkmark_color="#FFFFFF").pack(anchor="w", padx=10, pady=(0, 6))
-
-ctx_slider_row = customtkinter.CTkFrame(ctx_block, fg_color="transparent")
-ctx_slider_row.pack(fill="x", padx=10, pady=(0, 7))
-ctx_slider_row.grid_columnconfigure(0, weight=1)
-ctx_slider_row.grid_columnconfigure(1, weight=1)
-
-ctx_left = customtkinter.CTkFrame(ctx_slider_row, fg_color="transparent")
-ctx_left.grid(row=0, column=0, sticky="ew", padx=(0, 4))
-customtkinter.CTkLabel(ctx_left, text="RADIUS (px)", font=MONO_S, text_color=TXT_DIM, anchor="w").pack(fill="x")
-customtkinter.CTkSlider(ctx_left, from_=10, to=50, variable=context_radius_var, command=update_params, button_color=ACCENT, button_hover_color=ACCENT_DIM, progress_color=ACCENT, fg_color=BG_INPUT, height=12, number_of_steps=40).pack(fill="x", pady=(2, 1))
-customtkinter.CTkLabel(ctx_left, textvariable=ctx_radius_display_var, font=MONO_S, text_color=ACCENT, anchor="e").pack(fill="x")
-
-ctx_right = customtkinter.CTkFrame(ctx_slider_row, fg_color="transparent")
-ctx_right.grid(row=0, column=1, sticky="ew", padx=(4, 0))
-customtkinter.CTkLabel(ctx_right, text="RATIO (%)", font=MONO_S, text_color=TXT_DIM, anchor="w").pack(fill="x")
-customtkinter.CTkSlider(ctx_right, from_=0, to=100, variable=context_ratio_var, command=update_params, button_color=ACCENT, button_hover_color=ACCENT_DIM, progress_color=ACCENT, fg_color=BG_INPUT, height=12, number_of_steps=100).pack(fill="x", pady=(2, 1))
-customtkinter.CTkLabel(ctx_right, textvariable=ctx_ratio_display_var, font=MONO_S, text_color=ACCENT, anchor="e").pack(fill="x")
-
-color_top = customtkinter.CTkFrame(tab_color, fg_color=BG_PANEL_2, corner_radius=4)
-color_top.pack(fill="x", padx=6, pady=6)
-
-pick_row = customtkinter.CTkFrame(color_top, fg_color="transparent")
-pick_row.pack(fill="x", padx=9, pady=(7, 3))
-customtkinter.CTkButton(pick_row, text="▶ PICK PIXEL FROM SCREEN", command=start_pick_pixel, height=28, font=MONO_B, fg_color=OK_GREEN, hover_color="#2BB070", text_color="#000000").pack(side="left", fill="x", expand=True)
-pick_status_lbl = customtkinter.CTkLabel(pick_row, text="ready", font=MONO_S, text_color=TXT_DIM, width=120, anchor="e")
-pick_status_lbl.pack(side="right", padx=(8, 0))
-
-hex_row = customtkinter.CTkFrame(color_top, fg_color="transparent")
-hex_row.pack(fill="x", padx=9, pady=(3, 4))
-customtkinter.CTkLabel(hex_row, text="HEX", font=MONO_B, text_color=TXT_DIM).pack(side="left", padx=(0, 6))
-customtkinter.CTkEntry(hex_row, textvariable=hex_var, width=100, fg_color=BG_INPUT, border_color=BORDER, font=MONO, text_color=TXT, height=26).pack(side="left", padx=(0, 5))
-customtkinter.CTkButton(hex_row, text="APPLY", command=set_from_hex, width=60, height=26, font=MONO_B, fg_color=ACCENT, hover_color=ACCENT_DIM).pack(side="left", padx=(0, 8))
-swatch_canvas = tk.Canvas(hex_row, width=80, height=26, highlightthickness=1, highlightbackground=BORDER, bg=BG_INPUT)
-swatch_canvas.pack(side="left")
-update_swatch(swatch_canvas, hex_var.get())
-
-tol_row = customtkinter.CTkFrame(color_top, fg_color="transparent")
-tol_row.pack(fill="x", padx=9, pady=(0, 3))
-
-
-def tol_field(parent, label, var, w=58):
+def rizz_section_label_67(parent, key):
     f = customtkinter.CTkFrame(parent, fg_color="transparent")
-    f.pack(side="left", padx=(0, 10))
-    customtkinter.CTkLabel(f, text=label, font=MONO_S, text_color=TXT_DIM).pack(side="left", padx=(0, 4))
-    customtkinter.CTkEntry(f, textvariable=var, width=w, height=24, fg_color=BG_INPUT, border_color=BORDER, font=MONO_S, text_color=TXT).pack(side="left")
+    f.pack(fill="x", padx=14, pady=(10, 4))
+    lbl = customtkinter.CTkLabel(f, text=rizz_T_67(key).upper(),
+                                 font=("Segoe UI", 10, "bold"),
+                                 text_color=SIGMA_TEXT_DIM_67, anchor="w")
+    lbl.pack(side="left")
+    sigma_reg_67(lbl, key, uppercase=True)
     return f
 
+def sigma_add_slider_row_67(parent, label_key, var, display_var, key,
+                            frm, to, is_int=False, on_change=None):
+    card = customtkinter.CTkFrame(parent, fg_color=RIZZ_BG_CARD_67, corner_radius=6)
+    card.pack(fill="x", padx=14, pady=3)
+    card.grid_columnconfigure(1, weight=1)
+    lbl = customtkinter.CTkLabel(card, text=rizz_T_67(label_key),
+                                 font=("Segoe UI", 11),
+                                 text_color=SKIBIDY_TEXT_LIGHT_67, anchor="w", width=170)
+    lbl.grid(row=0, column=0, sticky="w", padx=(12, 6), pady=8)
+    sigma_reg_67(lbl, label_key)
+    s = customtkinter.CTkSlider(card, from_=frm, to=to, variable=var,
+                                command=on_change if on_change else skibidy_update_params_67,
+                                button_color=SIGMA_ACCENT_67,
+                                button_hover_color=RIZZ_ACCENT_HOV_67,
+                                progress_color=SKIBIDY_ACCENT_DIM_67,
+                                fg_color=SKIBIDY_BG_INPUT_67, height=14)
+    s.grid(row=0, column=1, sticky="ew", padx=8, pady=8)
+    val = customtkinter.CTkLabel(card, textvariable=display_var,
+                                 font=("Consolas", 11),
+                                 text_color=SIGMA_ACCENT_67, width=52, anchor="e")
+    val.grid(row=0, column=2, sticky="e", padx=(6, 14), pady=8)
+    if key:
+        skibidy_value_labels_67[key] = display_var
+    skibidy_neutralize_slider_wheel_67(s, sigma_find_scrollable_67(parent))
+    return lbl
 
-tol_field(tol_row, "TOL H", tol_h_var)
-tol_field(tol_row, "TOL S", tol_s_var)
-tol_field(tol_row, "TOL V", tol_v_var)
+def rizz_add_checkbox_row_67(parent, text_key, var, command=None):
+    card = customtkinter.CTkFrame(parent, fg_color=RIZZ_BG_CARD_67, corner_radius=6)
+    card.pack(fill="x", padx=14, pady=3)
+    chk = customtkinter.CTkCheckBox(
+        card, text=rizz_T_67(text_key), variable=var, command=command,
+        font=("Segoe UI", 11), text_color=SKIBIDY_TEXT_LIGHT_67,
+        fg_color=SIGMA_ACCENT_67, hover_color=RIZZ_ACCENT_HOV_67,
+        border_color=RIZZ_BORDER_67, checkmark_color="#ffffff")
+    chk.pack(anchor="w", padx=12, pady=8)
+    sigma_reg_67(chk, text_key)
+    return chk
 
-floors_block = customtkinter.CTkFrame(color_top, fg_color="transparent")
-floors_block.pack(fill="x", padx=9, pady=(3, 4))
-floors_block.grid_columnconfigure(0, weight=1)
-floors_block.grid_columnconfigure(1, weight=1)
+def sigma_add_entry_row_67(parent, label_key, var, button_text_key=None, button_cmd=None):
+    card = customtkinter.CTkFrame(parent, fg_color=RIZZ_BG_CARD_67, corner_radius=6)
+    card.pack(fill="x", padx=14, pady=3)
+    card.grid_columnconfigure(1, weight=1)
+    lbl = customtkinter.CTkLabel(card, text=rizz_T_67(label_key),
+                                 font=("Segoe UI", 11), text_color=SKIBIDY_TEXT_LIGHT_67,
+                                 width=170, anchor="w")
+    lbl.grid(row=0, column=0, sticky="w", padx=(12, 6), pady=8)
+    sigma_reg_67(lbl, label_key)
+    ent = customtkinter.CTkEntry(card, textvariable=var, height=28,
+                                 fg_color=SKIBIDY_BG_INPUT_67, border_color=RIZZ_BORDER_67,
+                                 text_color=SKIBIDY_TEXT_LIGHT_67)
+    ent.grid(row=0, column=1, sticky="ew", padx=6, pady=8)
+    btn = None
+    if button_text_key:
+        btn = customtkinter.CTkButton(
+            card, text=rizz_T_67(button_text_key), command=button_cmd,
+            width=60, height=28, fg_color=RIZZ_PRIMARY_67, hover_color=SKIBIDY_PRIMARY_HOV_67,
+            text_color=SKIBIDY_TEXT_LIGHT_67, corner_radius=4, font=("Segoe UI", 11))
+        btn.grid(row=0, column=2, padx=(0, 12), pady=8)
+        sigma_reg_67(btn, button_text_key)
+    return ent, btn
 
-sf_frame = customtkinter.CTkFrame(floors_block, fg_color="transparent")
-sf_frame.grid(row=0, column=0, sticky="ew", padx=(0, 4))
-customtkinter.CTkLabel(sf_frame, text="S FLOOR (cut sky/ground)", font=MONO_S, text_color=TXT_DIM, anchor="w").pack(fill="x")
-customtkinter.CTkSlider(sf_frame, from_=0, to=255, variable=s_floor_var, command=update_params, button_color=ACCENT, button_hover_color=ACCENT_DIM, progress_color=ACCENT, fg_color=BG_INPUT, height=12, number_of_steps=51).pack(fill="x", pady=(2, 1))
-customtkinter.CTkLabel(sf_frame, textvariable=s_floor_display_var, font=MONO_S, text_color=ACCENT, anchor="e").pack(fill="x")
+def skibidy_refresh_value_labels_67():
+    for key, var in skibidy_value_labels_67.items():
+        try:
+            if key in ("strength", "stability", "pf_mouse", "pf_aim",
+                       "roblox_sens", "movement_comp", "kp_gain", "kd_gain"):
+                src = {
+                    "strength": rizz_strength_var_67, "stability": sigma_stability_var_67,
+                    "pf_mouse": skibidy_pf_mouse_var_67, "pf_aim": rizz_pf_aim_var_67,
+                    "roblox_sens": sigma_roblox_sens_var_67,
+                    "movement_comp": rizz_movement_compensation_var_67,
+                    "kp_gain": sigma_kp_var_67, "kd_gain": skibidy_kd_var_67,
+                }[key]
+                var.set(skibidy_format_value_67(src.get()))
+            elif key in ("max_step", "deadzone", "fov", "offset_x", "offset_y",
+                         "tol_h", "tol_s", "tol_v", "roi_radius",
+                         "ch_size"):
+                src = {
+                    "max_step": skibidy_max_step_var_67, "deadzone": rizz_deadzone_var_67,
+                    "fov": sigma_fov_var_67, "offset_x": skibidy_offset_x_var_67,
+                    "offset_y": rizz_offset_y_var_67, "tol_h": rizz_tol_h_var_67,
+                    "tol_s": sigma_tol_s_var_67, "tol_v": skibidy_tol_v_var_67,
+                    "roi_radius": rizz_roi_radius_var_67, "ch_size": rizz_ch_size_var_67,
+                }[key]
+                var.set(str(int(src.get())))
+        except Exception:
+            pass
 
-vf_frame = customtkinter.CTkFrame(floors_block, fg_color="transparent")
-vf_frame.grid(row=0, column=1, sticky="ew", padx=(4, 0))
-customtkinter.CTkLabel(vf_frame, text="V FLOOR (cut dark edges)", font=MONO_S, text_color=TXT_DIM, anchor="w").pack(fill="x")
-customtkinter.CTkSlider(vf_frame, from_=0, to=255, variable=v_floor_var, command=update_params, button_color=ACCENT, button_hover_color=ACCENT_DIM, progress_color=ACCENT, fg_color=BG_INPUT, height=12, number_of_steps=51).pack(fill="x", pady=(2, 1))
-customtkinter.CTkLabel(vf_frame, textvariable=v_floor_display_var, font=MONO_S, text_color=ACCENT, anchor="e").pack(fill="x")
+def skibidy_update_params_67(*args):
+    global rizz_lock_strength_67, sigma_smooth_alpha_67
+    global rizz_max_step_px_67, skibidy_deadzone_px_67
+    global skibidy_fov_radius_67, sigma_offset_x_67, skibidy_offset_y_67
+    global sigma_roblox_sensitivity_67, skibidy_pf_mouse_sensitivity_67
+    global rizz_pf_aim_sensitivity_67
+    global sigma_movement_compensation_67, sigma_kp_67, skibidy_kd_67, sigma_roi_radius_67
 
-customtkinter.CTkCheckBox(color_top, text=" ADAPTIVE HSV (auto-tune, stricter)", variable=adaptive_var, command=update_params, fg_color=ACCENT, hover_color=ACCENT_DIM, font=MONO_S, text_color=TXT, border_color=BORDER, checkmark_color="#FFFFFF").pack(anchor="w", padx=9, pady=(0, 7))
-
-pal_block = customtkinter.CTkFrame(tab_color, fg_color=BG_PANEL_2, corner_radius=4)
-pal_block.pack(fill="both", expand=True, padx=6, pady=(0, 6))
-
-customtkinter.CTkLabel(pal_block, text="PALETTE", font=MONO_B, text_color=ACCENT).pack(anchor="w", padx=9, pady=(5, 3))
-
-pal_inner = customtkinter.CTkFrame(pal_block, fg_color="transparent")
-pal_inner.pack(fill="both", expand=True, padx=9, pady=(0, 7))
-pal_inner.grid_columnconfigure(0, weight=1)
-pal_inner.grid_rowconfigure(0, weight=1)
-
-palette_list = tk.Listbox(pal_inner, selectmode="multiple", height=5, bg=BG_INPUT, fg=TXT, selectbackground=ACCENT, selectforeground="#FFFFFF", borderwidth=0, highlightthickness=0, font=MONO, activestyle="none", exportselection=False)
-palette_list.grid(row=0, column=0, sticky="nsew", padx=(0, 5))
-
-pal_scroll = customtkinter.CTkScrollbar(pal_inner, command=palette_list.yview, fg_color=BG_INPUT, button_color=BORDER, button_hover_color=ACCENT)
-pal_scroll.grid(row=0, column=1, sticky="ns", padx=(0, 5))
-palette_list.configure(yscrollcommand=pal_scroll.set)
-palette_list.bind("<<ListboxSelect>>", on_palette_select)
-palette_list.bind("<Double-Button-1>", on_palette_double_click)
-
-palette_canvas = tk.Canvas(pal_inner, width=34, bg=BG_INPUT, highlightthickness=1, highlightbackground=BORDER)
-palette_canvas.grid(row=0, column=2, sticky="ns")
-
-pal_btns = customtkinter.CTkFrame(pal_block, fg_color="transparent")
-pal_btns.pack(fill="x", padx=9, pady=(0, 7))
-
-customtkinter.CTkButton(pal_btns, text="PICK IMAGE", command=choose_image, height=24, font=MONO_S, fg_color=BG_INPUT, hover_color=ACCENT_DIM, text_color=TXT, border_width=1, border_color=BORDER).pack(side="left", fill="x", expand=True, padx=(0, 4))
-
-customtkinter.CTkButton(pal_btns, text="SCAN FOLDER", command=auto_detect_colors_from_folder, height=24, font=MONO_S, fg_color=BG_INPUT, hover_color=ACCENT_DIM, text_color=TXT, border_width=1, border_color=BORDER).pack(side="left", fill="x", expand=True, padx=(4, 4))
-
-customtkinter.CTkButton(pal_btns, text="LOCK SELECTED", command=lock_selected_colors, height=24, font=MONO_B, fg_color=ACCENT, hover_color=ACCENT_DIM, text_color="#FFFFFF").pack(side="left", fill="x", expand=True, padx=(4, 0))
-
-vis_block = customtkinter.CTkFrame(tab_visual, fg_color=BG_PANEL_2, corner_radius=4)
-vis_block.pack(fill="x", padx=6, pady=6)
-
-customtkinter.CTkLabel(vis_block, text="VISUAL HELPERS", font=MONO_B, text_color=ACCENT).pack(anchor="w", padx=9, pady=(5, 3))
-
-customtkinter.CTkLabel(vis_block, text="FOV overlay + center dot are click-through.\n" "Match FOV RADIUS slider with the ring radius.\n" "Debug mask: set debug_mask_visible=True in Python\n" "console to open cv2 mask window.", font=MONO_S, text_color=TXT_DIM, justify="left").pack(anchor="w", padx=9, pady=(0, 9))
-
-status_tbl = customtkinter.CTkFrame(tab_visual, fg_color=BG_PANEL_2, corner_radius=4)
-status_tbl.pack(fill="x", padx=6, pady=(0, 6))
-customtkinter.CTkLabel(status_tbl, text="RUNTIME", font=MONO_B, text_color=ACCENT).pack(anchor="w", padx=9, pady=(5, 3))
-
-
-def stat_row(parent, label, var):
-    f = customtkinter.CTkFrame(parent, fg_color="transparent")
-    f.pack(fill="x", padx=9, pady=1)
-    customtkinter.CTkLabel(f, text=label, font=MONO_S, text_color=TXT_DIM, width=115, anchor="w").pack(side="left")
-    customtkinter.CTkLabel(f, textvariable=var, font=MONO_S, text_color=TXT, anchor="w").pack(side="left")
-
-
-stat_row(status_tbl, "state", status_var)
-stat_row(status_tbl, "loop hz", live_hz_var)
-stat_row(status_tbl, "lock hex", live_hex_var)
-stat_row(status_tbl, "ranges", live_ranges_var)
-stat_row(status_tbl, "contours", live_contours_var)
-stat_row(status_tbl, "raw / ctx-pass", live_ctx_var)
-stat_row(status_tbl, "candidates", live_hit_var)
-stat_row(status_tbl, "active tracks", live_tracks_var)
-stat_row(status_tbl, "target", live_target_var)
-stat_row(status_tbl, "err", live_err_var)
-customtkinter.CTkFrame(status_tbl, fg_color="transparent", height=7).pack()
-
-sens_block = customtkinter.CTkFrame(tab_config, fg_color=BG_PANEL_2, corner_radius=4)
-sens_block.pack(fill="x", padx=6, pady=6)
-customtkinter.CTkLabel(sens_block, text="SENSITIVITY", font=MONO_B, text_color=ACCENT).pack(anchor="w", padx=9, pady=(5, 3))
-
-
-def sens_row(parent, label, var, frm, to, disp):
-    f = customtkinter.CTkFrame(parent, fg_color="transparent", height=28)
-    f.pack(fill="x", padx=9, pady=2)
-    f.pack_propagate(False)
-    customtkinter.CTkLabel(f, text=label, font=MONO_S, text_color=TXT, width=135, anchor="w").pack(side="left")
-    customtkinter.CTkSlider(f, from_=frm, to=to, variable=var, command=update_params, button_color=ACCENT, button_hover_color=ACCENT_DIM, progress_color=ACCENT, fg_color=BG_INPUT, height=12).pack(side="left", fill="x", expand=True, padx=6)
-    customtkinter.CTkLabel(f, textvariable=disp, font=MONO_S, text_color=ACCENT, width=44, anchor="e").pack(side="right")
-
-
-sens_row(sens_block, "in-game mouse sens", pf_mouse_var, 0.1, 5.0, pf_mouse_display_var)
-sens_row(sens_block, "in-game aim sens", pf_aim_var, 0.1, 3.0, pf_aim_display_var)
-sens_row(sens_block, "roblox sensitivity", roblox_sens_var, 0.1, 2.0, roblox_display_var)
-customtkinter.CTkFrame(sens_block, fg_color="transparent", height=5).pack()
-
-key_block = customtkinter.CTkFrame(tab_config, fg_color=BG_PANEL_2, corner_radius=4)
-key_block.pack(fill="x", padx=6, pady=6)
-customtkinter.CTkLabel(key_block, text="AIM KEY", font=MONO_B, text_color=ACCENT).pack(anchor="w", padx=9, pady=(5, 3))
-
-key_inner = customtkinter.CTkFrame(key_block, fg_color="transparent")
-key_inner.pack(fill="x", padx=9, pady=(0, 7))
-
-key_display_lbl = customtkinter.CTkLabel(key_inner, textvariable=aim_key_display_var, font=MONO_B, text_color=TXT, fg_color=BG_INPUT, corner_radius=4, width=155, height=26)
-key_display_lbl.pack(side="left", padx=(0, 6))
-
-key_capture_active = [False]
-key_capture_start = [0.0]
-CAPTURE_DEADTIME = 0.30
-
-capture_btn = customtkinter.CTkButton(key_inner, text="SET KEY", command=lambda: None, width=125, height=26, font=MONO_B, fg_color=ACCENT, hover_color=ACCENT_DIM)
-capture_btn.pack(side="left")
-
-
-def _capture_ready():
-    if not key_capture_active[0]:
-        return False
-    if (time.time() - key_capture_start[0]) < CAPTURE_DEADTIME:
-        return False
-    return True
-
-
-def _commit_key(key_code):
-    global aim_key
-    if key_code is None:
-        return
-    if not (0 < int(key_code) < 256):
-        return
-    aim_key_var.set(int(key_code))
-    aim_key_display_var.set(get_key_name(int(key_code)))
-    aim_key = int(key_code)
-    key_display_lbl.configure(text_color=TXT)
-    capture_btn.configure(text="SET KEY")
-    key_capture_active[0] = False
-
-
-def _cancel_capture():
-    key_capture_active[0] = False
-    key_display_lbl.configure(text_color=TXT)
-    aim_key_display_var.set(get_key_name(aim_key))
-    capture_btn.configure(text="SET KEY")
-
-
-def start_key_capture():
-    key_capture_active[0] = True
-    key_capture_start[0] = time.time()
-    key_display_lbl.configure(text_color=ACCENT)
-    aim_key_display_var.set("Press any key...")
-    capture_btn.configure(text="...")
+    rizz_lock_strength_67 = sigma_round_to_2_67(rizz_strength_var_67.get())
+    sigma_smooth_alpha_67 = max(0.01, 1.0 - sigma_round_to_2_67(sigma_stability_var_67.get()))
+    rizz_max_step_px_67 = int(skibidy_max_step_var_67.get())
+    skibidy_deadzone_px_67 = int(rizz_deadzone_var_67.get())
+    skibidy_fov_radius_67 = int(sigma_fov_var_67.get())
+    sigma_offset_x_67 = int(skibidy_offset_x_var_67.get())
+    skibidy_offset_y_67 = int(rizz_offset_y_var_67.get())
+    sigma_roblox_sensitivity_67 = float(sigma_roblox_sens_var_67.get())
+    skibidy_pf_mouse_sensitivity_67 = float(skibidy_pf_mouse_var_67.get())
+    rizz_pf_aim_sensitivity_67 = float(rizz_pf_aim_var_67.get())
     try:
-        root.focus_force()
+        sigma_movement_compensation_67 = sigma_round_to_2_67(rizz_movement_compensation_var_67.get())
+        sigma_kp_67 = sigma_round_to_2_67(sigma_kp_var_67.get())
+        skibidy_kd_67 = sigma_round_to_2_67(skibidy_kd_var_67.get())
+        sigma_roi_radius_67 = int(rizz_roi_radius_var_67.get())
+    except Exception:
+        pass
+    skibidy_refresh_value_labels_67()
+    rizz_auto_save_67()
+
+def rizz_update_verify_params_67():
+    global rizz_verify_enabled_67, skibidy_verify_tol_h_67, rizz_verify_tol_s_67
+    global sigma_verify_tol_v_67, skibidy_verify_roi_67, rizz_verify_min_px_67
+    global sigma_verify_frames_required_67, sigma_verify_hex_list_67
+
+    rizz_verify_enabled_67 = bool(sigma_verify_enable_var_67.get())
+    skibidy_verify_tol_h_67 = int(rizz_verify_tol_h_var_67.get())
+    rizz_verify_tol_s_67 = int(sigma_verify_tol_s_var_67.get())
+    sigma_verify_tol_v_67 = int(skibidy_verify_tol_v_var_67.get())
+    skibidy_verify_roi_67 = int(rizz_verify_roi_var_67.get())
+    rizz_verify_min_px_67 = int(sigma_verify_minpx_var_67.get())
+    sigma_verify_frames_required_67 = max(1, int(skibidy_verify_frames_var_67.get()))
+
+    def parse_list(s):
+        return [x.strip() for x in s.split(",")
+                if x.strip().startswith("#") and len(x.strip()) == 7]
+
+    sigma_verify_hex_list_67 = parse_list(skibidy_verify_hexes_var_67.get()) or ["#3AA0FF"]
+    skibidy_rebuild_verify_ranges_67()
+    rizz_auto_save_67()
+
+def sigma_on_ch_style_change_67(choice):
+    for k in SIGMA_CROSSHAIR_STYLES_67:
+        if rizz_T_67(f"ch_{k}") == choice:
+            sigma_ch_style_internal_67["v"] = k
+            break
+    rizz_auto_save_67()
+
+_rizz_auto_save_ready_67 = False
+
+def rizz_auto_save_67():
+    if not _rizz_auto_save_ready_67:
+        return
+    sigma_save_settings_67()
+
+def skibidy_draw_crosshair_67(canvas, cx, cy, color, size):
+    style = sigma_ch_style_internal_67["v"]
+    h = size
+    t = 2
+
+    if style == "dot":
+        r = max(1, size // 6)
+        canvas.create_oval(cx - r, cy - r, cx + r, cy + r,
+                           fill=color, outline="")
+    elif style == "cross":
+        canvas.create_line(cx - h, cy, cx + h, cy, fill=color, width=t)
+        canvas.create_line(cx, cy - h, cx, cy + h, fill=color, width=t)
+    elif style == "circle":
+        canvas.create_oval(cx - h, cy - h, cx + h, cy + h,
+                           outline=color, width=t)
+    elif style == "t_cross":
+        canvas.create_line(cx - h, cy, cx + h, cy, fill=color, width=t)
+        canvas.create_line(cx, cy - h, cx, cy, fill=color, width=t)
+    elif style == "x_cross":
+        d = int(h * 0.7)
+        canvas.create_line(cx - d, cy - d, cx + d, cy + d, fill=color, width=t)
+        canvas.create_line(cx - d, cy + d, cx + d, cy - d, fill=color, width=t)
+    elif style == "chevron":
+        d = int(h * 0.7)
+        canvas.create_line(cx - d, cy + d // 2, cx, cy - d, fill=color, width=t)
+        canvas.create_line(cx, cy - d, cx + d, cy + d // 2, fill=color, width=t)
+    elif style == "dot_circle":
+        canvas.create_oval(cx - h, cy - h, cx + h, cy + h,
+                           outline=color, width=t)
+        r = max(1, size // 8)
+        canvas.create_oval(cx - r, cy - r, cx + r, cy + r,
+                           fill=color, outline="")
+    elif style == "brackets":
+        g = max(3, size // 3)
+        L = h
+        canvas.create_line(cx - L, cy - L, cx - L + g, cy - L, fill=color, width=t)
+        canvas.create_line(cx - L, cy - L, cx - L, cy - L + g, fill=color, width=t)
+        canvas.create_line(cx + L, cy - L, cx + L - g, cy - L, fill=color, width=t)
+        canvas.create_line(cx + L, cy - L, cx + L, cy - L + g, fill=color, width=t)
+        canvas.create_line(cx - L, cy + L, cx - L + g, cy + L, fill=color, width=t)
+        canvas.create_line(cx - L, cy + L, cx - L, cy + L - g, fill=color, width=t)
+        canvas.create_line(cx + L, cy + L, cx + L - g, cy + L, fill=color, width=t)
+        canvas.create_line(cx + L, cy + L, cx + L, cy + L - g, fill=color, width=t)
+
+def rizz_ensure_overlay_67():
+    global skibidy_overlay_67, rizz_overlay_canvas_67, sigma_transparent_supported_67
+    if skibidy_overlay_67 is None or not skibidy_overlay_67.winfo_exists():
+        skibidy_overlay_67 = tk.Toplevel(rizz_root_67)
+        skibidy_overlay_67.overrideredirect(True)
+        skibidy_overlay_67.attributes("-topmost", True)
+        try:
+            skibidy_overlay_67.attributes("-transparentcolor", "magenta")
+            bgc = "magenta"
+            sigma_transparent_supported_67 = True
+        except Exception:
+            bgc = "black"
+            sigma_transparent_supported_67 = False
+        skibidy_overlay_67.configure(bg=bgc)
+        rizz_overlay_canvas_67 = tk.Canvas(skibidy_overlay_67, bg=bgc,
+                                           highlightthickness=0, width=100, height=100)
+        rizz_overlay_canvas_67.pack(fill="both", expand=True)
+        skibidy_overlay_67.update_idletasks()
+        sigma_make_click_through_67(skibidy_overlay_67, sigma_transparent_supported_67)
+        if rizz_exclude_capture_var_67.get():
+            rizz_exclude_from_capture_67(skibidy_overlay_67, True)
+    skibidy_update_overlay_67()
+
+def skibidy_update_overlay_67():
+    global skibidy_overlay_67, rizz_overlay_canvas_67
+    if skibidy_overlay_67 is None or not skibidy_overlay_67.winfo_exists():
+        return
+
+    aiming = win32api.GetAsyncKeyState(rizz_current_aim_vk_67) < 0
+    hide_idle = sigma_ov_hide_idle_var_67.get()
+
+    want_fov = sigma_show_fov_var_67.get() and not (hide_idle and not aiming)
+    want_cross = skibidy_show_crosshair_var_67.get() and not (hide_idle and not aiming)
+    want_box = sigma_ov_show_box_var_67.get() and not (hide_idle and not aiming)
+    want_line = rizz_ov_show_aim_line_var_67.get() and not (hide_idle and not aiming)
+    want_fps = skibidy_ov_show_fps_var_67.get()
+
+    if not (want_fov or want_cross or want_box or want_line or want_fps):
+        rizz_hide_overlay_67()
+        return
+
+    skibidy_overlay_67.geometry(f"{sigma_config_67.sigma_width_67}x{sigma_config_67.skibidy_height_67}+0+0")
+    skibidy_overlay_67.deiconify()
+    skibidy_overlay_67.lift()
+    rizz_overlay_canvas_67.delete("all")
+
+    color = rizz_rainbow_color_67() if skibidy_ov_rainbow_var_67.get() else (rizz_ov_color_var_67.get() or "#ff4040")
+
+    if want_fov:
+        r = int(sigma_fov_var_67.get())
+        cx = sigma_config_67.rizz_center_x_67
+        cy = sigma_config_67.rizz_center_y_67
+        rizz_overlay_canvas_67.create_oval(cx - r, cy - r, cx + r, cy + r,
+                                           outline=color, width=2)
+
+    if want_cross:
+        cx = sigma_config_67.rizz_center_x_67
+        cy = sigma_config_67.rizz_center_y_67
+        skibidy_draw_crosshair_67(rizz_overlay_canvas_67, cx, cy, color, int(rizz_ch_size_var_67.get()))
+
+    if want_box and skibidy_overlay_target_screen_67 is not None:
+        tx, ty = skibidy_overlay_target_screen_67
+        box = int(rizz_verify_roi_67)
+        rizz_overlay_canvas_67.create_rectangle(tx - box, ty - box,
+                                                tx + box, ty + box,
+                                                outline=color, width=2)
+
+    if want_line and skibidy_overlay_target_screen_67 is not None:
+        tx, ty = skibidy_overlay_target_screen_67
+        rizz_overlay_canvas_67.create_line(sigma_config_67.rizz_center_x_67,
+                                           sigma_config_67.rizz_center_y_67,
+                                           tx, ty, fill=color, width=1)
+
+    if want_fps:
+        rizz_overlay_canvas_67.create_text(20, 20, anchor="nw",
+                                           text=f"FPS {rizz_overlay_fps_value_67}",
+                                           fill=color, font=("Consolas", 12, "bold"))
+
+def rizz_hide_overlay_67():
+    global skibidy_overlay_67
+    try:
+        if skibidy_overlay_67 and skibidy_overlay_67.winfo_exists():
+            skibidy_overlay_67.withdraw()
     except Exception:
         pass
 
+def sigma_on_capture_exclude_toggle_67():
+    en = rizz_exclude_capture_var_67.get()
+    rizz_exclude_from_capture_67(rizz_root_67, en)
+    if skibidy_overlay_67 and skibidy_overlay_67.winfo_exists():
+        rizz_exclude_from_capture_67(skibidy_overlay_67, en)
+    rizz_auto_save_67()
 
-capture_btn.configure(command=start_key_capture)
+def skibidy_run_loop_67():
+    global rizz_running_67, skibidy_track_cx_67, rizz_track_cy_67
+    global skibidy_prev_toggle_state_67
+    global skibidy_ema_dx_67, rizz_ema_dy_67
+    global rizz_prev_err_x_67, sigma_prev_err_y_67
+    global skibidy_aim_enabled_67, rizz_current_aim_vk_67
+    global sigma_current_toggle_vk_67
+    global skibidy_overlay_target_screen_67, rizz_overlay_fps_value_67
 
+    rizz_running_67 = True
+    s = mss.MSS()
+    fps_frames = 0
+    fps_t0 = time.time()
+    while rizz_running_67:
+        time.sleep(0.001)
+        try:
+            GameFrame = np.array(s.grab(rizz_region_c_67))
+            GameFrame = cv2.cvtColor(GameFrame, cv2.COLOR_BGRA2BGR)
+        except Exception:
+            continue
 
-def capture_key(event):
-    if not _capture_ready():
+        skibidy_overlay_target_screen_67 = None
+
+        tk_state = win32api.GetAsyncKeyState(sigma_current_toggle_vk_67)
+        if tk_state < 0 and skibidy_prev_toggle_state_67 >= 0:
+            skibidy_aim_enabled_67 = not skibidy_aim_enabled_67
+            if skibidy_aim_enabled_67:
+                rizz_beep_sigma_on_67()
+            else:
+                rizz_beep_sigma_off_67()
+        skibidy_prev_toggle_state_67 = tk_state
+
+        if win32api.GetAsyncKeyState(0x75) < 0:
+            break
+
+        if skibidy_aim_enabled_67 and win32api.GetAsyncKeyState(rizz_current_aim_vk_67) < 0:
+            frame_hsv = cv2.cvtColor(GameFrame, cv2.COLOR_BGR2HSV)
+            mask = skibidy_build_mask_67(frame_hsv)
+            mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, skibidy_kernel_67, iterations=1)
+            mask = cv2.dilate(mask, skibidy_kernel_67, iterations=1)
+            mask = cv2.medianBlur(mask, 5)
+            contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL,
+                                           cv2.CHAIN_APPROX_SIMPLE)
+            if contours:
+                centroids = []
+                for c in contours:
+                    a = cv2.contourArea(c)
+                    if a < rizz_min_area_67:
+                        continue
+                    M = cv2.moments(c)
+                    if M["m00"] == 0:
+                        continue
+                    cx_i = M["m10"] / M["m00"]
+                    cy_i = M["m01"] / M["m00"]
+                    if (cx_i - skibidy_crosshair_u_67) ** 2 + (cy_i - skibidy_crosshair_u_67) ** 2 <= skibidy_fov_radius_67 ** 2:
+                        centroids.append((cx_i, cy_i, a, c))
+                if centroids:
+                    if skibidy_track_cx_67 is not None:
+                        near = [t for t in centroids
+                                if (t[0] - skibidy_track_cx_67) ** 2 +
+                                   (t[1] - rizz_track_cy_67) ** 2 <= sigma_roi_radius_67 ** 2]
+                        chosen = min(near, key=lambda t: (t[0] - skibidy_track_cx_67) ** 2 +
+                                                          (t[1] - rizz_track_cy_67) ** 2) \
+                                 if near else max(centroids, key=lambda t: t[2])
+                    else:
+                        chosen = max(centroids, key=lambda t: t[2])
+                    cx, cy, area, _ = chosen
+
+                    if not rizz_verify_target_67(frame_hsv, cx, cy):
+                        skibidy_track_cx_67, rizz_track_cy_67 = None, None
+                        rizz_prev_err_x_67 = 0.0
+                        sigma_prev_err_y_67 = 0.0
+                        skibidy_ema_dx_67 = 0.0
+                        rizz_ema_dy_67 = 0.0
+                        continue
+
+                    skibidy_track_cx_67, rizz_track_cy_67 = cx, cy
+                    skibidy_overlay_target_screen_67 = (rizz_region_c_67["left"] + int(cx),
+                                                        rizz_region_c_67["top"] + int(cy))
+
+                    target_x = cx + sigma_offset_x_67
+                    target_y = cy + skibidy_offset_y_67
+                    err_x = -(skibidy_crosshair_u_67 - target_x)
+                    err_y = -(skibidy_crosshair_u_67 - target_y)
+                    if abs(err_x) < skibidy_deadzone_px_67:
+                        err_x = 0.0
+                    if abs(err_y) < skibidy_deadzone_px_67:
+                        err_y = 0.0
+
+                    cross_x = np.sign(err_x) != np.sign(rizz_prev_err_x_67)
+                    cross_y = np.sign(err_y) != np.sign(sigma_prev_err_y_67)
+                    scale_x = np.tanh(abs(err_x) / 10.0)
+                    scale_y = np.tanh(abs(err_y) / 10.0)
+
+                    PF_sensitivity = skibidy_pf_mouse_sensitivity_67 * rizz_pf_aim_sensitivity_67
+                    finalMult = ((sigma_roblox_sensitivity_67 * PF_sensitivity) / 0.55 +
+                                 sigma_movement_compensation_67) * rizz_lock_strength_67
+
+                    dx_raw = (sigma_kp_67 * err_x + skibidy_kd_67 * (err_x - rizz_prev_err_x_67)) * finalMult * scale_x
+                    dy_raw = (sigma_kp_67 * err_y + skibidy_kd_67 * (err_y - sigma_prev_err_y_67)) * finalMult * scale_y
+                    if cross_x:
+                        dx_raw *= 0.5
+                    if cross_y:
+                        dy_raw *= 0.5
+                    dx_raw = float(np.clip(dx_raw, -rizz_max_step_px_67, rizz_max_step_px_67))
+                    dy_raw = float(np.clip(dy_raw, -rizz_max_step_px_67, rizz_max_step_px_67))
+                    skibidy_ema_dx_67 = (1 - sigma_smooth_alpha_67) * skibidy_ema_dx_67 + sigma_smooth_alpha_67 * dx_raw
+                    rizz_ema_dy_67 = (1 - sigma_smooth_alpha_67) * rizz_ema_dy_67 + sigma_smooth_alpha_67 * dy_raw
+                    win32api.mouse_event(win32con.MOUSEEVENTF_MOVE,
+                                         int(skibidy_ema_dx_67), int(rizz_ema_dy_67), 0, 0)
+                    rizz_prev_err_x_67 = err_x
+                    sigma_prev_err_y_67 = err_y
+
+        fps_frames += 1
+        now = time.time()
+        if now - fps_t0 >= 1.0:
+            rizz_overlay_fps_value_67 = fps_frames
+            fps_frames = 0
+            fps_t0 = now
+
+    cv2.destroyAllWindows()
+
+def sigma_run_worker_67():
+    global sigma_worker_67
+    if sigma_worker_67 and sigma_worker_67.is_alive():
         return
-    vk = None
+    sigma_worker_67 = threading.Thread(target=skibidy_run_loop_67, daemon=True)
+    sigma_worker_67.start()
+    sigma_status_var_67.set(rizz_T_67("status_running"))
+
+def skibidy_stop_worker_67():
+    global rizz_running_67
+    rizz_running_67 = False
+    sigma_status_var_67.set(rizz_T_67("status_stopped"))
+    rizz_hide_overlay_67()
+
+_rizz_capturing_67 = None
+_skibidy_capture_start_67 = 0.0
+
+def sigma_clear_capture_67():
+    global _rizz_capturing_67
+    _rizz_capturing_67 = None
     try:
-        kc = event.keycode
-        if kc is not None and 0 < int(kc) < 256:
-            vk = int(kc)
+        skibidy_aim_vk_btn_67.configure(text=rizz_vk_display_67(rizz_current_aim_vk_67))
+        rizz_toggle_vk_btn_67.configure(text=rizz_vk_display_67(sigma_current_toggle_vk_67))
     except Exception:
-        vk = None
-    if vk is None:
-        vk = KEYSYM_TO_VK.get(event.keysym)
-    _commit_key(vk)
+        pass
 
+def skibidy_cancel_capture_67():
+    sigma_clear_capture_67()
 
-def capture_mouse(event):
-    if not _capture_ready():
+def rizz_start_capture_67(which):
+    global _rizz_capturing_67, _skibidy_capture_start_67
+    if _rizz_capturing_67:
+        skibidy_cancel_capture_67()
         return
-    btn_map = {1: 0x01, 2: 0x04, 3: 0x02, 4: 0x05, 5: 0x06}
-    _commit_key(btn_map.get(event.num))
+    _rizz_capturing_67 = which
+    _skibidy_capture_start_67 = time.time()
+    btn = {"aim": skibidy_aim_vk_btn_67, "toggle": rizz_toggle_vk_btn_67}.get(which)
+    if btn is not None:
+        btn.configure(text="...")
 
+    def finish(vk):
+        global rizz_current_aim_vk_67, sigma_current_toggle_vk_67
+        if which == "aim":
+            rizz_current_aim_vk_67 = vk
+            skibidy_aim_vk_btn_67.configure(text=rizz_vk_display_67(vk))
+        elif which == "toggle":
+            sigma_current_toggle_vk_67 = vk
+            rizz_toggle_vk_btn_67.configure(text=rizz_vk_display_67(vk))
+        sigma_clear_capture_67()
+        rizz_auto_save_67()
 
-def cancel_capture(_event=None):
-    if key_capture_active[0]:
-        _cancel_capture()
+    def on_key(key):
+        if _rizz_capturing_67 != which:
+            return False
+        if time.time() - _skibidy_capture_start_67 < 0.25:
+            return
+        vk = sigma_key_event_to_vk_67(key)
+        if vk == 0x1B:
+            skibidy_cancel_capture_67()
+            return False
+        if vk:
+            finish(vk)
+        return False
 
+    def on_mouse(x, y, button, pressed):
+        if _rizz_capturing_67 != which:
+            return False
+        if not pressed:
+            return
+        if time.time() - _skibidy_capture_start_67 < 0.25:
+            return
+        vk = skibidy_mouse_event_to_vk_67(button)
+        if vk:
+            finish(vk)
+        return False
 
-root.bind("<KeyPress>", capture_key)
-root.bind("<ButtonPress>", capture_mouse)
-root.bind("<Escape>", cancel_capture)
+    kl = pkeyboard.Listener(on_press=on_key)
+    ml = pmouse.Listener(on_click=on_mouse)
+    kl.daemon = True
+    ml.daemon = True
+    kl.start()
+    ml.start()
 
-prof_block = customtkinter.CTkFrame(tab_config, fg_color=BG_PANEL_2, corner_radius=4)
-prof_block.pack(fill="x", padx=6, pady=6)
-customtkinter.CTkLabel(prof_block, text="PROFILE MANAGER", font=MONO_B, text_color=ACCENT).pack(anchor="w", padx=9, pady=(5, 3))
+sigma_palette_data_67 = []
+skibidy_palette_row_widgets_67 = []
 
-prof_list_frame = customtkinter.CTkFrame(prof_block, fg_color="transparent")
-prof_list_frame.pack(fill="x", padx=9, pady=3)
+def rizz_refresh_palette_ui_67():
+    for w in skibidy_palette_row_widgets_67:
+        w.destroy()
+    skibidy_palette_row_widgets_67.clear()
 
-profile_listbox = tk.Listbox(prof_list_frame, height=3, bg=BG_INPUT, fg=TXT, selectbackground=ACCENT, selectforeground="#FFFFFF", borderwidth=0, highlightthickness=0, font=MONO_S)
-profile_listbox.pack(side="left", fill="x", expand=True)
+    for idx, item in enumerate(sigma_palette_data_67):
+        row = customtkinter.CTkFrame(sigma_palette_inner_67, fg_color="transparent", height=22)
+        row.pack(fill="x", pady=1)
+        row.pack_propagate(False)
 
-prof_btn_frame = customtkinter.CTkFrame(prof_block, fg_color="transparent")
-prof_btn_frame.pack(fill="x", padx=9, pady=(3, 7))
+        rb = customtkinter.CTkRadioButton(
+            row, text="", variable=skibidy_selected_palette_index_67, value=idx,
+            width=18, radiobutton_width=14, radiobutton_height=14,
+            fg_color=SIGMA_ACCENT_67, hover_color=RIZZ_ACCENT_HOV_67, border_color=RIZZ_BORDER_67,
+            command=sigma_on_palette_radio_67)
+        rb.pack(side="left", padx=(2, 6))
 
+        sw = tk.Canvas(row, width=28, height=16, bg=SKIBIDY_BG_INPUT_67,
+                       highlightthickness=1, highlightbackground=RIZZ_BORDER_67)
+        sw.create_rectangle(0, 0, 28, 16, outline="", fill=item["hex"])
+        sw.pack(side="left", padx=(0, 6))
 
-def refresh_profile_list():
-    profile_listbox.delete(0, tk.END)
-    profiles = load_profiles()
-    for name in profiles:
-        profile_listbox.insert(tk.END, name)
+        customtkinter.CTkLabel(row, text=item["hex"], font=("Consolas", 10),
+                               text_color=SKIBIDY_TEXT_LIGHT_67, width=72,
+                               anchor="w").pack(side="left")
+        customtkinter.CTkLabel(row, text=f"{item['pct']:5.2f}%",
+                               font=("Consolas", 10), text_color=SIGMA_TEXT_DIM_67,
+                               width=60, anchor="e").pack(side="right", padx=(0, 6))
+        skibidy_palette_row_widgets_67.append(row)
 
+    if sigma_palette_data_67 and skibidy_selected_palette_index_67.get() < 0:
+        skibidy_selected_palette_index_67.set(0)
+        sigma_on_palette_radio_67(skip_hex=True)
 
-def _profile_snapshot():
-    return {
-        "hex": hex_var.get(),
-        "tol_h": tol_h_var.get(),
-        "tol_s": tol_s_var.get(),
-        "tol_v": tol_v_var.get(),
-        "s_floor": s_floor_var.get(),
-        "v_floor": v_floor_var.get(),
-        "lock_strength": round_to_2(strength_var.get()),
-        "smooth_alpha": round_to_2(stability_var.get()),
-        "pf_mouse_sensitivity": pf_mouse_var.get(),
-        "pf_aim_sensitivity": pf_aim_var.get(),
-        "roblox_sensitivity": roblox_sens_var.get(),
-        "max_step": max_step_var.get(),
-        "deadzone": deadzone_var.get(),
-        "fov": fov_var.get(),
-        "offset_x": offset_x_var.get(),
-        "offset_y": offset_y_var.get(),
-        "aim_key": aim_key_var.get(),
-        "lead": lead_var.get(),
-        "w_area": w_area_var.get(),
-        "w_dist": w_dist_var.get(),
-        "w_stick": w_stick_var.get(),
-        "switch_cooldown": cooldown_var.get(),
-        "hysteresis": hyst_var.get(),
-        "shape_filter": shape_filter_var.get(),
-        "adaptive_hsv": adaptive_var.get(),
-        "context_check": context_var.get(),
-        "context_radius": context_radius_var.get(),
-        "context_ratio": context_ratio_var.get(),
-        "show_fov": show_fov_var.get(),
-        "show_dot": show_dot_var.get(),
-        "palette": list(palette_list.get(0, tk.END)),
-    }
+def sigma_on_palette_radio_67(skip_hex=False):
+    idx = skibidy_selected_palette_index_67.get()
+    if 0 <= idx < len(sigma_palette_data_67):
+        item = sigma_palette_data_67[idx]
+        skibidy_hex_var_67.set(item["hex"])
+        rizz_update_swatch_67(skibidy_swatch_canvas_67, item["hex"])
 
+def skibidy_set_from_hex_67():
+    global rizz_active_ranges_67
+    s = skibidy_hex_var_67.get()
+    rng = sigma_range_from_hex_67(s, int(rizz_tol_h_var_67.get()),
+                                  int(sigma_tol_s_var_67.get()), int(skibidy_tol_v_var_67.get()))
+    if rng:
+        rizz_active_ranges_67 = [rng]
+        sigma_set_locked_hex_67(s)
+        rizz_update_swatch_67(skibidy_swatch_canvas_67, s)
+        skibidy_refresh_locked_label_67()
+    rizz_auto_save_67()
 
-def _profile_apply(data):
-    hex_var.set(data.get("hex", "#FDFCB3"))
-    tol_h_var.set(data.get("tol_h", 8))
-    tol_s_var.set(data.get("tol_s", 40))
-    tol_v_var.set(data.get("tol_v", 40))
-    s_floor_var.set(data.get("s_floor", 180))
-    v_floor_var.set(data.get("v_floor", 200))
-    strength_var.set(round_to_2(data.get("lock_strength", 1.5)))
-    stability_var.set(round_to_2(data.get("smooth_alpha", 0.35)))
-    max_step_var.set(data.get("max_step", 5))
-    deadzone_var.set(data.get("deadzone", 3))
-    fov_var.set(data.get("fov", 70))
-    offset_x_var.set(data.get("offset_x", 0))
-    offset_y_var.set(data.get("offset_y", -2))
-    pf_mouse_var.set(data.get("pf_mouse_sensitivity", 0.5))
-    pf_aim_var.set(data.get("pf_aim_sensitivity", 1.0))
-    roblox_sens_var.set(data.get("roblox_sensitivity", 0.55))
-    lead_var.set(data.get("lead", 1.5))
-    w_area_var.set(data.get("w_area", 0.20))
-    w_dist_var.set(data.get("w_dist", 0.60))
-    w_stick_var.set(data.get("w_stick", 0.40))
-    cooldown_var.set(data.get("switch_cooldown", 120))
-    hyst_var.set(data.get("hysteresis", 15))
-    shape_filter_var.set(data.get("shape_filter", True))
-    adaptive_var.set(data.get("adaptive_hsv", False))
-    context_var.set(data.get("context_check", True))
-    context_radius_var.set(data.get("context_radius", 25))
-    context_ratio_var.set(data.get("context_ratio", 25))
-    show_fov_var.set(data.get("show_fov", True))
-    show_dot_var.set(data.get("show_dot", False))
+def rizz_choose_image_67():
+    global sigma_palette_data_67
+    p = filedialog.askopenfilename(
+        filetypes=[("Image", "*.png;*.jpg;*.jpeg;*.bmp;*.webp")])
+    if not p:
+        return
+    rows = skibidy_analyze_single_image_67(p, top_n=8)
+    sigma_palette_data_67 = rows
+    skibidy_selected_palette_index_67.set(-1)
+    rizz_refresh_palette_ui_67()
+    if rows:
+        skibidy_hex_var_67.set(rows[0]["hex"])
+        rizz_update_swatch_67(skibidy_swatch_canvas_67, rows[0]["hex"])
 
-    saved_key = data.get("aim_key", 0x10)
-    aim_key_var.set(saved_key)
-    aim_key_display_var.set(get_key_name(saved_key))
-    global aim_key
-    aim_key = saved_key
-
-    palette_list.delete(0, tk.END)
-    for c in data.get("palette", []):
-        palette_list.insert(tk.END, c)
-    update_palette_canvas(data.get("palette", []))
-
-    active_hexes.clear()
-    hx_upper = hex_var.get().upper()
-    if hx_upper and hx_upper != "#-":
-        active_hexes.append(hx_upper)
+def sigma_analyze_images_folder_67():
+    global sigma_palette_data_67
+    folder = skibidy_folder_var_67.get().strip() or "images"
+    if not os.path.isdir(folder):
+        try:
+            os.makedirs(folder, exist_ok=True)
+        except Exception:
+            return
+    rows, processed, total = sigma_analyze_folder_colors_67(
+        folder, skip_dark=rizz_skip_dark_var_67.get(),
+        skip_gray=sigma_skip_gray_var_67.get(), top_n=12)
+    sigma_palette_data_67 = rows
+    skibidy_selected_palette_index_67.set(-1)
+    rizz_refresh_palette_ui_67()
+    if rows:
+        skibidy_hex_var_67.set(rows[0]["hex"])
+        rizz_update_swatch_67(skibidy_swatch_canvas_67, rows[0]["hex"])
     else:
-        active_hexes.append("#FDFCB3")
+        fallback = [
+            {"hex": "#FEFFB2", "hsv": (30, 240, 255), "count": 0, "pct": 100.0},
+            {"hex": "#FF0000", "hsv": (0, 255, 255), "count": 0, "pct": 0.0},
+            {"hex": "#00FF00", "hsv": (60, 255, 255), "count": 0, "pct": 0.0},
+            {"hex": "#0000FF", "hsv": (120, 255, 255), "count": 0, "pct": 0.0},
+        ]
+        sigma_palette_data_67 = fallback
+        rizz_refresh_palette_ui_67()
+        skibidy_hex_var_67.set(fallback[0]["hex"])
+        rizz_update_swatch_67(skibidy_swatch_canvas_67, fallback[0]["hex"])
 
-    rebuild_active_ranges_from_hexes()
-    update_params()
-    update_swatch(swatch_canvas, hex_var.get())
+def rizz_lock_selected_color_67():
+    global rizz_active_ranges_67
+    idx = skibidy_selected_palette_index_67.get()
+    if idx < 0 or idx >= len(sigma_palette_data_67):
+        return
+    item = sigma_palette_data_67[idx]
+    rng = sigma_range_from_hex_67(item["hex"], int(rizz_tol_h_var_67.get()),
+                                  int(sigma_tol_s_var_67.get()),
+                                  int(skibidy_tol_v_var_67.get()))
+    if rng:
+        rizz_active_ranges_67 = [rng]
+        sigma_set_locked_hex_67(item["hex"])
+        rizz_update_swatch_67(skibidy_swatch_canvas_67, item["hex"])
+        skibidy_hex_var_67.set(item["hex"])
+        skibidy_refresh_locked_label_67()
+    rizz_auto_save_67()
 
+def sigma_clear_palette_67():
+    global sigma_palette_data_67
+    sigma_palette_data_67 = []
+    skibidy_selected_palette_index_67.set(-1)
+    rizz_refresh_palette_ui_67()
 
-def save_as_profile():
-    name = simpledialog.askstring("Save Profile", "Enter profile name:")
+def skibidy_pick_folder_67():
+    d = filedialog.askdirectory(initialdir=skibidy_folder_var_67.get() or ".")
+    if d:
+        skibidy_folder_var_67.set(d)
+        rizz_auto_save_67()
+
+def skibidy_refresh_locked_label_67():
+    if not rizz_active_ranges_67 or not sigma_locked_hex_67:
+        skibidy_locked_label_67.configure(text="—", text_color=SIGMA_TEXT_DIM_67)
+        return
+    if skibidy_locked_hsv_67 is not None:
+        h, s, v = skibidy_locked_hsv_67
+        skibidy_locked_label_67.configure(text=f"{sigma_locked_hex_67}   HSV[{h},{s},{v}]",
+                                          text_color=SIGMA_ACCENT_67)
+    else:
+        skibidy_locked_label_67.configure(text=sigma_locked_hex_67, text_color=SIGMA_ACCENT_67)
+
+rizz_root_67.grid_columnconfigure(0, minsize=SIGMA_SIDEBAR_W_67, weight=0)
+rizz_root_67.grid_columnconfigure(1, weight=1)
+rizz_root_67.grid_rowconfigure(0, weight=1)
+
+skibidy_sidebar_67 = customtkinter.CTkFrame(rizz_root_67, fg_color=SKIBIDY_BG_SIDEBAR_67, corner_radius=0,
+                                            width=SIGMA_SIDEBAR_W_67)
+skibidy_sidebar_67.grid(row=0, column=0, sticky="nsew")
+skibidy_sidebar_67.grid_propagate(False)
+
+sigma_content_67 = customtkinter.CTkFrame(rizz_root_67, fg_color=SIGMA_BG_PANEL_67, corner_radius=0)
+sigma_content_67.grid(row=0, column=1, sticky="nsew")
+sigma_content_67.grid_propagate(False)
+sigma_content_67.grid_rowconfigure(1, weight=1)
+sigma_content_67.grid_columnconfigure(0, weight=1)
+
+skibidy_sb_header_67 = customtkinter.CTkFrame(skibidy_sidebar_67, fg_color="transparent", height=54)
+skibidy_sb_header_67.pack(fill="x", padx=10, pady=(12, 6))
+skibidy_sb_header_67.pack_propagate(False)
+
+skibidy_sb_logo_67 = tk.Canvas(skibidy_sb_header_67, width=26, height=26, bg=SKIBIDY_BG_SIDEBAR_67,
+                               highlightthickness=0)
+skibidy_sb_logo_67.pack(side="left", padx=(2, 8))
+skibidy_sb_logo_67.create_oval(2, 2, 24, 24, outline=SIGMA_ACCENT_67, width=3)
+skibidy_sb_logo_67.create_oval(9, 9, 17, 17, outline=SIGMA_ACCENT_67, width=2)
+
+customtkinter.CTkLabel(skibidy_sb_header_67, text="Aimzen",
+                       font=("Segoe UI", 15, "bold"),
+                       text_color=SKIBIDY_TEXT_LIGHT_67, anchor="w").pack(side="left")
+
+sigma_lang_btn_67 = customtkinter.CTkButton(
+    skibidy_sb_header_67, text=rizz_T_67("lang_btn"), command=sigma_toggle_lang_67,
+    width=36, height=24, fg_color=RIZZ_PRIMARY_67, hover_color=SKIBIDY_PRIMARY_HOV_67,
+    text_color=SIGMA_ACCENT_67, font=("Segoe UI", 11, "bold"), corner_radius=4)
+sigma_lang_btn_67.pack(side="right")
+
+skibidy_sb_nav_67 = customtkinter.CTkFrame(skibidy_sidebar_67, fg_color="transparent")
+skibidy_sb_nav_67.pack(fill="x", padx=10, pady=(0, 6))
+
+rizz_nav_buttons_67 = {}
+sigma_active_tab_67 = {"name": "aim"}
+
+def skibidy_make_nav_button_67(parent, key, label_key):
+    btn = customtkinter.CTkButton(
+        parent, text=rizz_T_67(label_key), anchor="w",
+        font=("Segoe UI", 12), fg_color="transparent",
+        hover_color=RIZZ_PRIMARY_67, text_color=SIGMA_TEXT_DIM_67,
+        corner_radius=6, height=34)
+    btn.pack(fill="x", pady=2)
+    rizz_nav_buttons_67[key] = btn
+    sigma_reg_67(btn, label_key)
+    btn.configure(command=lambda k=key: skibidy_switch_tab_67(k))
+
+def sigma_paint_nav_67():
+    for k, btn in rizz_nav_buttons_67.items():
+        if k == sigma_active_tab_67["name"]:
+            btn.configure(fg_color=SIGMA_ACCENT_67, text_color="#ffffff",
+                          hover_color=RIZZ_ACCENT_HOV_67)
+        else:
+            btn.configure(fg_color="transparent", text_color=SIGMA_TEXT_DIM_67,
+                          hover_color=RIZZ_PRIMARY_67)
+
+skibidy_make_nav_button_67(skibidy_sb_nav_67, "aim", "nav_aim")
+skibidy_make_nav_button_67(skibidy_sb_nav_67, "visual", "nav_visual")
+skibidy_make_nav_button_67(skibidy_sb_nav_67, "enemy", "nav_filter")
+skibidy_make_nav_button_67(skibidy_sb_nav_67, "misc", "nav_adv")
+skibidy_make_nav_button_67(skibidy_sb_nav_67, "config", "nav_prof")
+
+skibidy_sb_footer_67 = customtkinter.CTkFrame(skibidy_sidebar_67, fg_color=RIZZ_BG_CARD_67,
+                                              corner_radius=6, height=58)
+skibidy_sb_footer_67.pack(side="bottom", fill="x", padx=10, pady=10)
+skibidy_sb_footer_67.pack_propagate(False)
+
+sigma_footer_inner_67 = customtkinter.CTkFrame(skibidy_sb_footer_67, fg_color="transparent")
+sigma_footer_inner_67.pack(fill="both", expand=True, padx=8, pady=8)
+sigma_footer_inner_67.grid_columnconfigure(1, weight=1)
+
+skibidy_sb_status_dot_67 = tk.Canvas(sigma_footer_inner_67, width=10, height=10, bg=RIZZ_BG_CARD_67,
+                                     highlightthickness=0)
+skibidy_sb_status_dot_67.grid(row=0, column=0, padx=(2, 6))
+rizz_sb_status_dot_id_67 = skibidy_sb_status_dot_67.create_oval(1, 1, 9, 9,
+                                                                fill=SIGMA_TEXT_DIM_67, outline="")
+
+skibidy_sb_status_lbl_67 = customtkinter.CTkLabel(sigma_footer_inner_67, textvariable=sigma_status_var_67,
+                                                  font=("Segoe UI", 11),
+                                                  text_color=SKIBIDY_TEXT_LIGHT_67, anchor="w")
+skibidy_sb_status_lbl_67.grid(row=0, column=1, sticky="w")
+
+skibidy_start_stop_btn_67 = customtkinter.CTkButton(
+    sigma_footer_inner_67, text=rizz_T_67("btn_start"), width=62, height=26,
+    fg_color=SIGMA_ACCENT_67, hover_color=RIZZ_ACCENT_HOV_67, text_color="#ffffff",
+    font=("Segoe UI", 11, "bold"), corner_radius=4)
+
+def sigma_toggle_running_67():
+    if rizz_running_67:
+        skibidy_stop_worker_67()
+        rizz_beep_skibidy_stop_67()
+    else:
+        rizz_beep_skibidy_start_67()
+        rizz_ensure_overlay_67()
+        sigma_run_worker_67()
+    rizz_refresh_start_stop_btn_67()
+
+def rizz_refresh_start_stop_btn_67():
+    try:
+        if rizz_running_67:
+            skibidy_start_stop_btn_67.configure(text=rizz_T_67("btn_stop"), fg_color=SIGMA_DANGER_67,
+                                                hover_color=RIZZ_DANGER_HOV_67)
+            skibidy_sb_status_dot_67.itemconfig(rizz_sb_status_dot_id_67, fill=SIGMA_ACCENT_67)
+        else:
+            skibidy_start_stop_btn_67.configure(text=rizz_T_67("btn_start"), fg_color=SIGMA_ACCENT_67,
+                                                hover_color=RIZZ_ACCENT_HOV_67)
+            skibidy_sb_status_dot_67.itemconfig(rizz_sb_status_dot_id_67, fill=SIGMA_TEXT_DIM_67)
+    except Exception:
+        pass
+
+skibidy_start_stop_btn_67.configure(command=sigma_toggle_running_67)
+skibidy_start_stop_btn_67.grid(row=0, column=2, padx=(6, 2))
+
+skibidy_top_bar_67 = customtkinter.CTkFrame(sigma_content_67, fg_color=RIZZ_BG_CARD_67, height=42,
+                                            corner_radius=0)
+skibidy_top_bar_67.grid(row=0, column=0, sticky="ew")
+skibidy_top_bar_67.grid_propagate(False)
+skibidy_top_bar_67.grid_columnconfigure(0, weight=1)
+
+skibidy_top_title_67 = customtkinter.CTkLabel(skibidy_top_bar_67, text="Aimbot",
+                                              font=("Segoe UI", 14, "bold"),
+                                              text_color=SKIBIDY_TEXT_LIGHT_67, anchor="w")
+skibidy_top_title_67.grid(row=0, column=0, sticky="w", padx=16, pady=10)
+
+rizz_page_host_67 = customtkinter.CTkFrame(sigma_content_67, fg_color=SIGMA_BG_PANEL_67, corner_radius=0)
+rizz_page_host_67.grid(row=1, column=0, sticky="nsew")
+rizz_page_host_67.grid_rowconfigure(0, weight=1)
+rizz_page_host_67.grid_columnconfigure(0, weight=1)
+
+rizz_pages_67 = {}
+
+def sigma_make_page_67(key):
+    scroll = customtkinter.CTkScrollableFrame(
+        rizz_page_host_67, fg_color=SIGMA_BG_PANEL_67,
+        scrollbar_button_color=RIZZ_PRIMARY_67,
+        scrollbar_button_hover_color=SKIBIDY_PRIMARY_HOV_67,
+        corner_radius=0)
+    rizz_pages_67[key] = scroll
+    return scroll
+
+skibidy_page_aim_67 = sigma_make_page_67("aim")
+
+rizz_section_label_67(skibidy_page_aim_67, "sec_target_color")
+
+skibidy_card_hex_67 = customtkinter.CTkFrame(skibidy_page_aim_67, fg_color=RIZZ_BG_CARD_67, corner_radius=6)
+skibidy_card_hex_67.pack(fill="x", padx=14, pady=3)
+skibidy_card_hex_67.grid_columnconfigure(1, weight=1)
+_rizz_lbl_67 = customtkinter.CTkLabel(skibidy_card_hex_67, text=rizz_T_67("lbl_hex"),
+                                      font=("Segoe UI", 11), text_color=SKIBIDY_TEXT_LIGHT_67,
+                                      width=170, anchor="w")
+_rizz_lbl_67.grid(row=0, column=0, sticky="w", padx=(12, 6), pady=8)
+sigma_reg_67(_rizz_lbl_67, "lbl_hex")
+customtkinter.CTkEntry(skibidy_card_hex_67, textvariable=skibidy_hex_var_67, height=28,
+                       fg_color=SKIBIDY_BG_INPUT_67, border_color=RIZZ_BORDER_67,
+                       text_color=SKIBIDY_TEXT_LIGHT_67).grid(row=0, column=1,
+                                                              sticky="ew", padx=6, pady=8)
+rizz_btn_apply_hex_67 = customtkinter.CTkButton(
+    skibidy_card_hex_67, text=rizz_T_67("btn_apply"), command=skibidy_set_from_hex_67,
+    width=60, height=28, fg_color=RIZZ_PRIMARY_67, hover_color=SKIBIDY_PRIMARY_HOV_67,
+    text_color=SKIBIDY_TEXT_LIGHT_67, corner_radius=4, font=("Segoe UI", 11))
+rizz_btn_apply_hex_67.grid(row=0, column=2, padx=(0, 6), pady=8)
+sigma_reg_67(rizz_btn_apply_hex_67, "btn_apply")
+skibidy_swatch_canvas_67 = tk.Canvas(skibidy_card_hex_67, width=44, height=28,
+                                     highlightthickness=1, highlightbackground=RIZZ_BORDER_67,
+                                     bg=SKIBIDY_BG_INPUT_67)
+skibidy_swatch_canvas_67.grid(row=0, column=3, padx=(0, 12), pady=8)
+
+sigma_add_slider_row_67(skibidy_page_aim_67, "lbl_hue_tol", rizz_tol_h_var_67, rizz_tol_h_display_67,
+                        "tol_h", 0, 90, True)
+sigma_add_slider_row_67(skibidy_page_aim_67, "lbl_sat_tol", sigma_tol_s_var_67, sigma_tol_s_display_67,
+                        "tol_s", 0, 255, True)
+sigma_add_slider_row_67(skibidy_page_aim_67, "lbl_bri_tol", skibidy_tol_v_var_67, skibidy_tol_v_display_67,
+                        "tol_v", 0, 255, True)
+
+skibidy_locked_label_67 = customtkinter.CTkLabel(
+    skibidy_page_aim_67, text="—", font=("Consolas", 10, "bold"),
+    text_color=SIGMA_TEXT_DIM_67, anchor="w")
+skibidy_locked_label_67.pack(fill="x", padx=18, pady=(0, 6))
+
+rizz_section_label_67(skibidy_page_aim_67, "sec_aim_response")
+sigma_add_slider_row_67(skibidy_page_aim_67, "lbl_lock_strength", rizz_strength_var_67, skibidy_strength_display_67,
+                        "strength", 0.5, 3.0)
+sigma_add_slider_row_67(skibidy_page_aim_67, "lbl_smoothing", sigma_stability_var_67, rizz_stability_display_67,
+                        "stability", 0.05, 0.99)
+sigma_add_slider_row_67(skibidy_page_aim_67, "lbl_mouse_sens", skibidy_pf_mouse_var_67, sigma_pf_mouse_display_67,
+                        "pf_mouse", 0.1, 5.0)
+sigma_add_slider_row_67(skibidy_page_aim_67, "lbl_aim_sens", rizz_pf_aim_var_67, skibidy_pf_aim_display_67,
+                        "pf_aim", 0.1, 3.0)
+sigma_add_slider_row_67(skibidy_page_aim_67, "lbl_game_sens", sigma_roblox_sens_var_67, rizz_roblox_display_67,
+                        "roblox_sens", 0.1, 2.0)
+sigma_add_slider_row_67(skibidy_page_aim_67, "lbl_max_step", skibidy_max_step_var_67, sigma_max_step_display_67,
+                        "max_step", 1, 20, True)
+sigma_add_slider_row_67(skibidy_page_aim_67, "lbl_deadzone", rizz_deadzone_var_67, skibidy_deadzone_display_67,
+                        "deadzone", 0, 15, True)
+sigma_add_slider_row_67(skibidy_page_aim_67, "lbl_fov", sigma_fov_var_67, rizz_fov_display_67,
+                        "fov", 30, 140, True)
+sigma_add_slider_row_67(skibidy_page_aim_67, "lbl_offset_x", skibidy_offset_x_var_67, sigma_offset_x_display_67,
+                        "offset_x", -100, 100, True)
+sigma_add_slider_row_67(skibidy_page_aim_67, "lbl_offset_y", rizz_offset_y_var_67, skibidy_offset_y_display_67,
+                        "offset_y", -100, 100, True)
+
+rizz_section_label_67(skibidy_page_aim_67, "sec_key_bindings")
+skibidy_card_hk_67 = customtkinter.CTkFrame(skibidy_page_aim_67, fg_color=RIZZ_BG_CARD_67, corner_radius=6)
+skibidy_card_hk_67.pack(fill="x", padx=14, pady=3)
+skibidy_card_hk_67.grid_columnconfigure(1, weight=1)
+
+def _rizz_hk_row_67(parent, row, label_key, init_text, cmd):
+    lbl = customtkinter.CTkLabel(parent, text=rizz_T_67(label_key),
+                                 font=("Segoe UI", 11), text_color=SKIBIDY_TEXT_LIGHT_67,
+                                 width=170, anchor="w")
+    lbl.grid(row=row, column=0, sticky="w", padx=(12, 6), pady=8)
+    sigma_reg_67(lbl, label_key)
+    btn = customtkinter.CTkButton(
+        parent, text=init_text, command=cmd,
+        fg_color=SKIBIDY_BG_INPUT_67, hover_color=SKIBIDY_PRIMARY_HOV_67,
+        text_color=SIGMA_ACCENT_67, font=("Consolas", 11, "bold"),
+        height=28, corner_radius=4)
+    btn.grid(row=row, column=1, sticky="ew", padx=6, pady=8)
+    return btn
+
+skibidy_aim_vk_btn_67 = _rizz_hk_row_67(skibidy_card_hk_67, 0, "lbl_aim_key",
+                                        rizz_vk_display_67(rizz_current_aim_vk_67),
+                                        lambda: rizz_start_capture_67("aim"))
+rizz_toggle_vk_btn_67 = _rizz_hk_row_67(skibidy_card_hk_67, 1, "lbl_enable_toggle",
+                                        rizz_vk_display_67(sigma_current_toggle_vk_67),
+                                        lambda: rizz_start_capture_67("toggle"))
+
+_rizz_lbl_67 = customtkinter.CTkLabel(skibidy_card_hk_67, text=rizz_T_67("lbl_panic_key"),
+                                      font=("Segoe UI", 11), text_color=SKIBIDY_TEXT_LIGHT_67,
+                                      width=170, anchor="w")
+_rizz_lbl_67.grid(row=2, column=0, sticky="w", padx=(12, 6), pady=8)
+sigma_reg_67(_rizz_lbl_67, "lbl_panic_key")
+customtkinter.CTkLabel(skibidy_card_hk_67, text="F6", font=("Consolas", 11, "bold"),
+                       text_color=SIGMA_TEXT_DIM_67).grid(row=2, column=1, sticky="w",
+                                                          padx=12, pady=8)
+
+skibidy_page_vis_67 = sigma_make_page_67("visual")
+
+rizz_section_label_67(skibidy_page_vis_67, "sec_crosshair")
+
+skibidy_card_cs_67 = customtkinter.CTkFrame(skibidy_page_vis_67, fg_color=RIZZ_BG_CARD_67, corner_radius=6)
+skibidy_card_cs_67.pack(fill="x", padx=14, pady=3)
+skibidy_card_cs_67.grid_columnconfigure(1, weight=1)
+
+_rizz_lbl_67 = customtkinter.CTkLabel(skibidy_card_cs_67, text=rizz_T_67("lbl_crosshair_style"),
+                                      font=("Segoe UI", 11), text_color=SKIBIDY_TEXT_LIGHT_67,
+                                      width=170, anchor="w")
+_rizz_lbl_67.grid(row=0, column=0, sticky="w", padx=(12, 6), pady=8)
+sigma_reg_67(_rizz_lbl_67, "lbl_crosshair_style")
+
+skibidy_ch_style_menu_67 = customtkinter.CTkOptionMenu(
+    skibidy_card_cs_67, variable=skibidy_ch_style_var_67,
+    values=[rizz_T_67(f"ch_{k}") for k in SIGMA_CROSSHAIR_STYLES_67],
+    command=sigma_on_ch_style_change_67,
+    fg_color=SKIBIDY_BG_INPUT_67, button_color=RIZZ_PRIMARY_67, button_hover_color=SKIBIDY_PRIMARY_HOV_67,
+    text_color=SKIBIDY_TEXT_LIGHT_67, font=("Segoe UI", 11),
+    dropdown_fg_color=RIZZ_BG_CARD_67, dropdown_text_color=SKIBIDY_TEXT_LIGHT_67,
+    dropdown_hover_color=RIZZ_PRIMARY_67)
+skibidy_ch_style_menu_67.grid(row=0, column=1, sticky="ew", padx=6, pady=8)
+skibidy_reg_menu_67(skibidy_ch_style_menu_67, [f"ch_{k}" for k in SIGMA_CROSSHAIR_STYLES_67])
+
+sigma_add_slider_row_67(skibidy_page_vis_67, "lbl_crosshair_size", rizz_ch_size_var_67, sigma_ch_size_display_67,
+                        "ch_size", 4, 40, True)
+
+rizz_section_label_67(skibidy_page_vis_67, "sec_overlay")
+
+rizz_add_checkbox_row_67(skibidy_page_vis_67, "chk_show_fov", sigma_show_fov_var_67, command=rizz_ensure_overlay_67)
+rizz_add_checkbox_row_67(skibidy_page_vis_67, "chk_show_crosshair", skibidy_show_crosshair_var_67, command=rizz_ensure_overlay_67)
+rizz_add_checkbox_row_67(skibidy_page_vis_67, "chk_show_box", sigma_ov_show_box_var_67, command=rizz_ensure_overlay_67)
+rizz_add_checkbox_row_67(skibidy_page_vis_67, "chk_show_fps", skibidy_ov_show_fps_var_67, command=rizz_ensure_overlay_67)
+rizz_add_checkbox_row_67(skibidy_page_vis_67, "chk_show_aim_line", rizz_ov_show_aim_line_var_67, command=rizz_ensure_overlay_67)
+rizz_add_checkbox_row_67(skibidy_page_vis_67, "chk_hide_idle", sigma_ov_hide_idle_var_67, command=rizz_ensure_overlay_67)
+rizz_add_checkbox_row_67(skibidy_page_vis_67, "chk_rainbow", skibidy_ov_rainbow_var_67, command=rizz_ensure_overlay_67)
+rizz_add_checkbox_row_67(skibidy_page_vis_67, "chk_exclude_capture", rizz_exclude_capture_var_67,
+                         command=sigma_on_capture_exclude_toggle_67)
+
+skibidy_card_ovc_67 = customtkinter.CTkFrame(skibidy_page_vis_67, fg_color=RIZZ_BG_CARD_67, corner_radius=6)
+skibidy_card_ovc_67.pack(fill="x", padx=14, pady=3)
+skibidy_card_ovc_67.grid_columnconfigure(1, weight=1)
+_rizz_lbl_67 = customtkinter.CTkLabel(skibidy_card_ovc_67, text=rizz_T_67("lbl_overlay_color"),
+                                      font=("Segoe UI", 11), text_color=SKIBIDY_TEXT_LIGHT_67,
+                                      width=170, anchor="w")
+_rizz_lbl_67.grid(row=0, column=0, sticky="w", padx=(12, 6), pady=8)
+sigma_reg_67(_rizz_lbl_67, "lbl_overlay_color")
+customtkinter.CTkEntry(skibidy_card_ovc_67, textvariable=rizz_ov_color_var_67, height=28,
+                       fg_color=SKIBIDY_BG_INPUT_67, border_color=RIZZ_BORDER_67,
+                       text_color=SKIBIDY_TEXT_LIGHT_67).grid(row=0, column=1,
+                                                              sticky="ew", padx=6, pady=8)
+skibidy_ov_swatch_67 = tk.Canvas(skibidy_card_ovc_67, width=44, height=28,
+                                 highlightthickness=1, highlightbackground=RIZZ_BORDER_67,
+                                 bg=SKIBIDY_BG_INPUT_67)
+skibidy_ov_swatch_67.grid(row=0, column=2, padx=(0, 12), pady=8)
+
+def _skibidy_update_ov_swatch_67(*_):
+    try:
+        skibidy_ov_swatch_67.delete("all")
+        skibidy_ov_swatch_67.create_rectangle(0, 0, 44, 28, outline="",
+                                              fill=rizz_ov_color_var_67.get())
+    except Exception:
+        pass
+    rizz_auto_save_67()
+rizz_ov_color_var_67.trace_add("write", _skibidy_update_ov_swatch_67)
+_skibidy_update_ov_swatch_67()
+
+rizz_section_label_67(skibidy_page_vis_67, "sec_palette_folder")
+
+skibidy_card_folder_67 = customtkinter.CTkFrame(skibidy_page_vis_67, fg_color=RIZZ_BG_CARD_67, corner_radius=6)
+skibidy_card_folder_67.pack(fill="x", padx=14, pady=3)
+skibidy_card_folder_67.grid_columnconfigure(1, weight=1)
+_rizz_lbl_67 = customtkinter.CTkLabel(skibidy_card_folder_67, text=rizz_T_67("lbl_folder_path"),
+                                      font=("Segoe UI", 11), text_color=SKIBIDY_TEXT_LIGHT_67,
+                                      width=170, anchor="w")
+_rizz_lbl_67.grid(row=0, column=0, sticky="w", padx=(12, 6), pady=8)
+sigma_reg_67(_rizz_lbl_67, "lbl_folder_path")
+customtkinter.CTkEntry(skibidy_card_folder_67, textvariable=skibidy_folder_var_67, height=28,
+                       fg_color=SKIBIDY_BG_INPUT_67, border_color=RIZZ_BORDER_67,
+                       text_color=SKIBIDY_TEXT_LIGHT_67).grid(row=0, column=1,
+                                                              sticky="ew", padx=6, pady=8)
+customtkinter.CTkButton(skibidy_card_folder_67, text="...", command=skibidy_pick_folder_67,
+                        width=34, height=28, fg_color=RIZZ_PRIMARY_67,
+                        hover_color=SKIBIDY_PRIMARY_HOV_67, text_color=SKIBIDY_TEXT_LIGHT_67,
+                        corner_radius=4).grid(row=0, column=2,
+                                              padx=(0, 12), pady=8)
+
+rizz_add_checkbox_row_67(skibidy_page_vis_67, "chk_ignore_dark", rizz_skip_dark_var_67)
+rizz_add_checkbox_row_67(skibidy_page_vis_67, "chk_ignore_gray", sigma_skip_gray_var_67)
+
+rizz_section_label_67(skibidy_page_vis_67, "sec_palette_detected")
+
+sigma_palette_wrap_67 = customtkinter.CTkFrame(skibidy_page_vis_67, fg_color=SKIBIDY_BG_INPUT_67,
+                                               corner_radius=6, height=180)
+sigma_palette_wrap_67.pack(fill="x", padx=14, pady=3)
+sigma_palette_wrap_67.pack_propagate(False)
+sigma_palette_wrap_67.grid_columnconfigure(0, weight=1)
+sigma_palette_wrap_67.grid_rowconfigure(0, weight=1)
+sigma_palette_canvas_67 = tk.Canvas(sigma_palette_wrap_67, bg=SKIBIDY_BG_INPUT_67,
+                                    highlightthickness=0, bd=0)
+sigma_palette_canvas_67.grid(row=0, column=0, sticky="nsew", padx=(4, 0), pady=4)
+skibidy_palette_scroll_67 = customtkinter.CTkScrollbar(
+    sigma_palette_wrap_67, orientation="vertical", command=sigma_palette_canvas_67.yview,
+    button_color=RIZZ_PRIMARY_67, button_hover_color=SKIBIDY_PRIMARY_HOV_67,
+    fg_color=SKIBIDY_BG_INPUT_67, width=12)
+skibidy_palette_scroll_67.grid(row=0, column=1, sticky="ns", pady=4, padx=(0, 4))
+sigma_palette_canvas_67.configure(yscrollcommand=skibidy_palette_scroll_67.set)
+sigma_palette_inner_67 = customtkinter.CTkFrame(sigma_palette_canvas_67, fg_color=SKIBIDY_BG_INPUT_67,
+                                                corner_radius=0)
+rizz_palette_inner_id_67 = sigma_palette_canvas_67.create_window((0, 0), window=sigma_palette_inner_67,
+                                                                 anchor="nw")
+
+def _rizz_on_palette_inner_cfg_67(event):
+    sigma_palette_canvas_67.configure(scrollregion=sigma_palette_canvas_67.bbox("all"))
+
+def _rizz_on_palette_canvas_cfg_67(event):
+    sigma_palette_canvas_67.itemconfig(rizz_palette_inner_id_67, width=event.width)
+
+sigma_palette_inner_67.bind("<Configure>", _rizz_on_palette_inner_cfg_67)
+sigma_palette_canvas_67.bind("<Configure>", _rizz_on_palette_canvas_cfg_67)
+
+def _rizz_palette_wheel_67(event):
+    sigma_palette_canvas_67.yview_scroll(int(-1 * (event.delta / 120)), "units")
+sigma_palette_canvas_67.bind("<MouseWheel>", _rizz_palette_wheel_67)
+sigma_palette_inner_67.bind("<MouseWheel>", _rizz_palette_wheel_67)
+
+skibidy_card_pal_btns_67 = customtkinter.CTkFrame(skibidy_page_vis_67, fg_color="transparent")
+skibidy_card_pal_btns_67.pack(fill="x", padx=14, pady=6)
+skibidy_card_pal_btns_67.grid_columnconfigure(0, weight=1)
+skibidy_card_pal_btns_67.grid_columnconfigure(1, weight=1)
+
+skibidy_btn_pick_image_67 = customtkinter.CTkButton(
+    skibidy_card_pal_btns_67, text=rizz_T_67("btn_load_img"), command=rizz_choose_image_67,
+    fg_color=RIZZ_PRIMARY_67, hover_color=SKIBIDY_PRIMARY_HOV_67, text_color=SKIBIDY_TEXT_LIGHT_67,
+    height=30, corner_radius=4, font=("Segoe UI", 11))
+skibidy_btn_pick_image_67.grid(row=0, column=0, sticky="ew", padx=(0, 3))
+sigma_reg_67(skibidy_btn_pick_image_67, "btn_load_img")
+
+skibidy_btn_analyze_67 = customtkinter.CTkButton(
+    skibidy_card_pal_btns_67, text=rizz_T_67("btn_scan"), command=sigma_analyze_images_folder_67,
+    fg_color=RIZZ_PRIMARY_67, hover_color=SKIBIDY_PRIMARY_HOV_67, text_color=SKIBIDY_TEXT_LIGHT_67,
+    height=30, corner_radius=4, font=("Segoe UI", 11))
+skibidy_btn_analyze_67.grid(row=0, column=1, sticky="ew", padx=(3, 0))
+sigma_reg_67(skibidy_btn_analyze_67, "btn_scan")
+
+skibidy_btn_lock_colors_67 = customtkinter.CTkButton(
+    skibidy_page_vis_67, text=rizz_T_67("btn_lock_color"), command=rizz_lock_selected_color_67,
+    fg_color=SIGMA_ACCENT_67, hover_color=RIZZ_ACCENT_HOV_67, text_color="#ffffff",
+    font=("Segoe UI", 11, "bold"), height=32, corner_radius=4)
+skibidy_btn_lock_colors_67.pack(fill="x", padx=14, pady=(4, 3))
+sigma_reg_67(skibidy_btn_lock_colors_67, "btn_lock_color")
+
+skibidy_btn_clear_67 = customtkinter.CTkButton(
+    skibidy_page_vis_67, text=rizz_T_67("btn_clear_palette"), command=sigma_clear_palette_67,
+    fg_color="transparent", border_width=1, border_color=RIZZ_BORDER_67,
+    hover_color=RIZZ_PRIMARY_67, text_color=SIGMA_TEXT_DIM_67, height=28, corner_radius=4,
+    font=("Segoe UI", 11))
+skibidy_btn_clear_67.pack(fill="x", padx=14, pady=(0, 10))
+sigma_reg_67(skibidy_btn_clear_67, "btn_clear_palette")
+
+skibidy_page_enemy_67 = sigma_make_page_67("enemy")
+
+rizz_section_label_67(skibidy_page_enemy_67, "sec_filter_rule")
+
+rizz_add_checkbox_row_67(skibidy_page_enemy_67, "chk_enable_filter", sigma_verify_enable_var_67,
+                         command=rizz_update_verify_params_67)
+
+skibidy_card_hint_67 = customtkinter.CTkFrame(skibidy_page_enemy_67, fg_color=RIZZ_BG_CARD_67, corner_radius=6)
+skibidy_card_hint_67.pack(fill="x", padx=14, pady=3)
+skibidy_hint_lbl_67 = customtkinter.CTkLabel(skibidy_card_hint_67, text=rizz_T_67("hint_filter"),
+                                             font=("Segoe UI", 10), text_color=SIGMA_TEXT_DIM_67,
+                                             justify="left", anchor="w")
+skibidy_hint_lbl_67.pack(fill="x", padx=12, pady=8)
+sigma_reg_67(skibidy_hint_lbl_67, "hint_filter")
+
+rizz_section_label_67(skibidy_page_enemy_67, "sec_marker_color")
+
+sigma_add_entry_row_67(skibidy_page_enemy_67, "lbl_marker_hexes", skibidy_verify_hexes_var_67,
+                       button_text_key="btn_apply", button_cmd=rizz_update_verify_params_67)
+
+skibidy_card_auto_67 = customtkinter.CTkFrame(skibidy_page_enemy_67, fg_color=RIZZ_BG_CARD_67, corner_radius=6)
+skibidy_card_auto_67.pack(fill="x", padx=14, pady=3)
+
+def skibidy_auto_detect_marker_67():
+    folder = skibidy_folder_var_67.get().strip() or "images"
+    if not os.path.isdir(folder):
+        return
+    rows, _, _ = sigma_analyze_folder_colors_67(folder, True, True, 40)
+    for r in rows:
+        h, s, v = r["hsv"]
+        if 95 <= h <= 135 and s > 80:
+            skibidy_verify_hexes_var_67.set(r["hex"])
+            rizz_update_verify_params_67()
+            break
+
+skibidy_btn_auto_67 = customtkinter.CTkButton(
+    skibidy_card_auto_67, text=rizz_T_67("btn_auto_detect"), command=skibidy_auto_detect_marker_67,
+    fg_color=RIZZ_PRIMARY_67, hover_color=SKIBIDY_PRIMARY_HOV_67, text_color=SKIBIDY_TEXT_LIGHT_67,
+    height=28, corner_radius=4, font=("Segoe UI", 11))
+skibidy_btn_auto_67.pack(fill="x", padx=12, pady=8)
+sigma_reg_67(skibidy_btn_auto_67, "btn_auto_detect")
+
+rizz_section_label_67(skibidy_page_enemy_67, "sec_marker_detection")
+
+def _rizz_vslider_67(parent, label_key, var, frm, to, on_change=None):
+    card = customtkinter.CTkFrame(parent, fg_color=RIZZ_BG_CARD_67, corner_radius=6)
+    card.pack(fill="x", padx=14, pady=3)
+    card.grid_columnconfigure(1, weight=1)
+    lbl = customtkinter.CTkLabel(card, text=rizz_T_67(label_key),
+                                 font=("Segoe UI", 11), text_color=SKIBIDY_TEXT_LIGHT_67,
+                                 width=170, anchor="w")
+    lbl.grid(row=0, column=0, sticky="w", padx=(12, 6), pady=8)
+    sigma_reg_67(lbl, label_key)
+    s = customtkinter.CTkSlider(card, from_=frm, to=to, variable=var,
+                                command=on_change if on_change else (
+                                    lambda _=0: rizz_update_verify_params_67()),
+                                button_color=SIGMA_ACCENT_67,
+                                button_hover_color=RIZZ_ACCENT_HOV_67,
+                                progress_color=SKIBIDY_ACCENT_DIM_67,
+                                fg_color=SKIBIDY_BG_INPUT_67, height=14)
+    s.grid(row=0, column=1, sticky="ew", padx=8, pady=8)
+    customtkinter.CTkLabel(card, textvariable=var, font=("Consolas", 11),
+                           text_color=SIGMA_ACCENT_67, width=52,
+                           anchor="e").grid(row=0, column=2, sticky="e",
+                                            padx=(6, 14), pady=8)
+    skibidy_neutralize_slider_wheel_67(s, sigma_find_scrollable_67(parent))
+
+_rizz_vslider_67(skibidy_page_enemy_67, "lbl_hue_tol", rizz_verify_tol_h_var_67, 0, 90)
+_rizz_vslider_67(skibidy_page_enemy_67, "lbl_sat_tol", sigma_verify_tol_s_var_67, 0, 255)
+_rizz_vslider_67(skibidy_page_enemy_67, "lbl_bri_tol", skibidy_verify_tol_v_var_67, 0, 255)
+_rizz_vslider_67(skibidy_page_enemy_67, "lbl_sample_radius", rizz_verify_roi_var_67, 6, 120)
+_rizz_vslider_67(skibidy_page_enemy_67, "lbl_required_px", sigma_verify_minpx_var_67, 1, 120)
+_rizz_vslider_67(skibidy_page_enemy_67, "lbl_required_frames", skibidy_verify_frames_var_67, 1, 10)
+
+rizz_section_label_67(skibidy_page_enemy_67, "sec_diag")
+skibidy_card_diag_67 = customtkinter.CTkFrame(skibidy_page_enemy_67, fg_color=RIZZ_BG_CARD_67, corner_radius=6)
+skibidy_card_diag_67.pack(fill="x", padx=14, pady=3)
+skibidy_diag_lbl_67 = customtkinter.CTkLabel(skibidy_card_diag_67, text=rizz_T_67("lbl_marker_diag"),
+                                             font=("Consolas", 10), text_color=SIGMA_TEXT_DIM_67,
+                                             anchor="w")
+skibidy_diag_lbl_67.pack(fill="x", padx=12, pady=8)
+
+skibidy_page_misc_67 = sigma_make_page_67("misc")
+
+rizz_section_label_67(skibidy_page_misc_67, "sec_movement")
+sigma_add_slider_row_67(skibidy_page_misc_67, "lbl_movement_comp", rizz_movement_compensation_var_67,
+                        rizz_movement_display_67, "movement_comp", -0.5, 0.5)
+
+rizz_section_label_67(skibidy_page_misc_67, "sec_gains")
+sigma_add_slider_row_67(skibidy_page_misc_67, "lbl_kp", sigma_kp_var_67, sigma_kp_display_67, "kp_gain", 0.05, 1.5)
+sigma_add_slider_row_67(skibidy_page_misc_67, "lbl_kd", skibidy_kd_var_67, skibidy_kd_display_67, "kd_gain", 0.0, 1.0)
+
+rizz_section_label_67(skibidy_page_misc_67, "sec_tracking")
+sigma_add_slider_row_67(skibidy_page_misc_67, "lbl_track_radius", rizz_roi_radius_var_67,
+                        rizz_roi_radius_display_67, "roi_radius", 10, 120, True)
+
+skibidy_page_cfg_67 = sigma_make_page_67("config")
+
+def _sigma_safe_filename_67(name):
+    bad = '<>:"/\\|?*'
+    out = "".join("_" if c in bad else c for c in name).strip()
+    return out[:60] or "profile"
+
+def _rizz_profile_path_67(name):
+    return os.path.join(SKIBIDY_CONFIGS_DIR_67, _sigma_safe_filename_67(name) + ".json")
+
+def _skibidy_read_configs_db_67():
+    db = {}
+    try:
+        for fn in os.listdir(SKIBIDY_CONFIGS_DIR_67):
+            if fn.startswith("_") or not fn.endswith(".json"):
+                continue
+            name = fn[:-5]
+            try:
+                with open(os.path.join(SKIBIDY_CONFIGS_DIR_67, fn), "r",
+                          encoding="utf-8") as f:
+                    db[name] = json.load(f)
+            except Exception:
+                pass
+    except Exception:
+        pass
+    return db
+
+rizz_section_label_67(skibidy_page_cfg_67, "sec_profiles")
+
+skibidy_card_profile_67 = customtkinter.CTkFrame(skibidy_page_cfg_67, fg_color=RIZZ_BG_CARD_67, corner_radius=6)
+skibidy_card_profile_67.pack(fill="x", padx=14, pady=3)
+skibidy_card_profile_67.grid_columnconfigure(0, weight=1)
+skibidy_card_profile_67.grid_columnconfigure(1, weight=0)
+
+skibidy_name_row_67 = customtkinter.CTkFrame(skibidy_card_profile_67, fg_color="transparent")
+skibidy_name_row_67.grid(row=0, column=0, columnspan=2, sticky="ew",
+                         padx=12, pady=(12, 6))
+skibidy_name_row_67.grid_columnconfigure(1, weight=1)
+
+_rizz_lbl_67 = customtkinter.CTkLabel(skibidy_name_row_67, text=rizz_T_67("lbl_profile_name"),
+                                      font=("Segoe UI", 11), text_color=SKIBIDY_TEXT_LIGHT_67,
+                                      anchor="w")
+_rizz_lbl_67.grid(row=0, column=0, sticky="w", padx=(0, 8))
+sigma_reg_67(_rizz_lbl_67, "lbl_profile_name")
+
+customtkinter.CTkEntry(skibidy_name_row_67, textvariable=rizz_config_name_var_67, height=28,
+                       fg_color=SKIBIDY_BG_INPUT_67, border_color=RIZZ_BORDER_67,
+                       text_color=SKIBIDY_TEXT_LIGHT_67).grid(row=0, column=1, sticky="ew")
+
+def skibidy_save_named_profile_67():
+    name = rizz_config_name_var_67.get().strip()
     if not name:
         return
-    profiles = load_profiles()
-    profiles[name] = _profile_snapshot()
-    save_profiles(profiles)
-    refresh_profile_list()
-    messagebox.showinfo("Success", f"Profile '{name}' saved.")
-
-
-def load_profile():
-    sel = profile_listbox.curselection()
-    if not sel:
-        return
-    name = profile_listbox.get(sel[0])
-    profiles = load_profiles()
-    if name not in profiles:
-        return
-    _profile_apply(profiles[name])
-    messagebox.showinfo("Success", f"Profile '{name}' loaded.")
-
-
-def delete_profile():
-    sel = profile_listbox.curselection()
-    if not sel:
-        return
-    name = profile_listbox.get(sel[0])
-    if messagebox.askyesno("Delete", f"Delete profile '{name}'?"):
-        profiles = load_profiles()
-        if name in profiles:
-            del profiles[name]
-            save_profiles(profiles)
-            refresh_profile_list()
-
-
-customtkinter.CTkButton(prof_btn_frame, text="SAVE AS", command=save_as_profile, height=22, font=MONO_S, fg_color=OK_GREEN, text_color="#000000").pack(side="left", fill="x", expand=True, padx=(0, 3))
-customtkinter.CTkButton(prof_btn_frame, text="LOAD", command=load_profile, height=22, font=MONO_S, fg_color=BG_INPUT, text_color=TXT).pack(side="left", fill="x", expand=True, padx=3)
-customtkinter.CTkButton(prof_btn_frame, text="DELETE", command=delete_profile, height=22, font=MONO_S, fg_color=ACCENT, text_color="#FFFFFF").pack(side="left", fill="x", expand=True, padx=(3, 0))
-
-cfg_block = customtkinter.CTkFrame(tab_config, fg_color=BG_PANEL_2, corner_radius=4)
-cfg_block.pack(fill="x", padx=6, pady=(0, 6))
-
-customtkinter.CTkLabel(cfg_block, text="GENERAL", font=MONO_B, text_color=ACCENT).pack(anchor="w", padx=9, pady=(5, 3))
-
-
-def reset_defaults():
-    hex_var.set("#FDFCB3")
-    tol_h_var.set(5)
-    tol_s_var.set(30)
-    tol_v_var.set(30)
-    s_floor_var.set(180)
-    v_floor_var.set(200)
-    strength_var.set(1.5)
-    stability_var.set(0.35)
-    max_step_var.set(5)
-    deadzone_var.set(3)
-    fov_var.set(70)
-    offset_x_var.set(0)
-    offset_y_var.set(-2)
-    pf_mouse_var.set(0.5)
-    pf_aim_var.set(1.0)
-    roblox_sens_var.set(0.55)
-    lead_var.set(1.5)
-    w_area_var.set(0.20)
-    w_dist_var.set(0.60)
-    w_stick_var.set(0.40)
-    cooldown_var.set(120)
-    hyst_var.set(15)
-    shape_filter_var.set(True)
-    adaptive_var.set(False)
-    context_var.set(True)
-    context_radius_var.set(25)
-    context_ratio_var.set(25)
-    aim_key_var.set(0x10)
-    aim_key_display_var.set("Left Shift")
-    global aim_key, adaptive_ranges, tracks, primary_track_id, min_saturation_floor, min_value_floor
-    aim_key = 0x10
-    adaptive_ranges = []
-    tracks = {}
-    primary_track_id = None
-    min_saturation_floor = 180
-    min_value_floor = 200
-    active_hexes.clear()
-    active_hexes.append("#FDFCB3")
-    rebuild_active_ranges_from_hexes()
-    update_params()
-
-
-customtkinter.CTkButton(cfg_block, text="RESET DEFAULTS", command=reset_defaults, height=26, font=MONO_B, fg_color=ACCENT, hover_color=ACCENT_DIM, text_color=TXT, border_width=1, border_color=BORDER).pack(fill="x", padx=9, pady=(3, 7))
-
-
-def poll_live_status():
-    global status_lock_hex, status_ranges
-    if status_lock_hex == "-" and active_hexes:
-        status_lock_hex = active_hexes[0]
-    if status_ranges == "0" and (active_ranges or adaptive_ranges):
-        status_ranges = str(len(active_ranges) + len(adaptive_ranges))
-
-    live_hex_var.set(status_lock_hex)
-    live_ranges_var.set(status_ranges)
-    live_contours_var.set(status_contours)
-    live_hit_var.set(status_hit)
-    live_target_var.set(status_target)
-    live_err_var.set(status_err)
-    live_hz_var.set(status_loop_hz)
-    live_tracks_var.set(status_tracks)
-    live_ctx_var.set(status_ctx)
-
     try:
-        live_swatch.delete("all")
-        hx = status_lock_hex
-        if hx and hx != "-":
-            live_swatch.create_rectangle(0, 0, 190, 6, fill=hx, outline="")
-        else:
-            live_swatch.create_rectangle(0, 0, 190, 6, fill=BG_INPUT, outline="")
-    except Exception:
-        pass
-
-    try:
-        if status_var.get() == "RUNNING":
-            top_status_lbl.configure(text_color=OK_GREEN)
-            top_status_var.set("RUNNING")
-        else:
-            top_status_lbl.configure(text_color=TXT_DIM)
-            top_status_var.set("STOPPED")
-    except Exception:
-        pass
-
-    try:
-        if overlay is not None and overlay.winfo_exists():
-            if show_fov_var.get() or show_dot_var.get():
-                r = int(fov_var.get())
-                d = 2 * r + 6
-                x = config.center_x - d // 2
-                y = config.center_y - d // 2
-                overlay.geometry(f"{d}x{d}+{x}+{y}")
-    except Exception:
-        pass
-
-    root.after(200, poll_live_status)
-
-
-PROFILES_FILE = "profiles.json"
-
-
-def load_profiles():
-    if not os.path.exists(PROFILES_FILE):
-        return {}
-    try:
-        with open(PROFILES_FILE, "r") as f:
-            return json.load(f)
-    except Exception:
-        return {}
-
-
-def save_profiles(profiles):
-    try:
-        with open(PROFILES_FILE, "w") as f:
-            json.dump(profiles, f, indent=2)
+        with open(_rizz_profile_path_67(name), "w", encoding="utf-8") as f:
+            json.dump(_sigma_collect_settings_67(), f, indent=2)
     except Exception as e:
-        print(f"Error saving profiles: {e}")
+        print(f"[profile] save failed: {e}")
+    rizz_refresh_profile_list_67()
 
+skibidy_btn_save_named_67 = customtkinter.CTkButton(
+    skibidy_name_row_67, text=rizz_T_67("btn_save"), width=64, height=28,
+    fg_color=SIGMA_ACCENT_67, hover_color=RIZZ_ACCENT_HOV_67, text_color="#ffffff",
+    font=("Segoe UI", 11, "bold"), corner_radius=4,
+    command=skibidy_save_named_profile_67)
+skibidy_btn_save_named_67.grid(row=0, column=2, padx=(8, 0))
+sigma_reg_67(skibidy_btn_save_named_67, "btn_save")
 
-def load_settings():
+skibidy_profile_list_wrap_67 = customtkinter.CTkFrame(skibidy_card_profile_67, fg_color=SKIBIDY_BG_INPUT_67,
+                                                      corner_radius=4, height=150)
+skibidy_profile_list_wrap_67.grid(row=1, column=0, columnspan=2, sticky="ew",
+                                  padx=12, pady=(0, 8))
+skibidy_profile_list_wrap_67.grid_propagate(False)
+
+skibidy_profile_listbox_67 = tk.Listbox(
+    skibidy_profile_list_wrap_67, bg=SKIBIDY_BG_INPUT_67, fg=SKIBIDY_TEXT_LIGHT_67,
+    selectbackground=SIGMA_ACCENT_67, selectforeground="#ffffff",
+    borderwidth=0, highlightthickness=0, activestyle="none",
+    font=("Segoe UI", 11))
+skibidy_profile_listbox_67.pack(fill="both", expand=True, padx=6, pady=6)
+
+skibidy_profile_btn_row_67 = customtkinter.CTkFrame(skibidy_card_profile_67, fg_color="transparent")
+skibidy_profile_btn_row_67.grid(row=2, column=0, columnspan=2, sticky="ew",
+                                padx=12, pady=(0, 12))
+skibidy_profile_btn_row_67.grid_columnconfigure(0, weight=1)
+skibidy_profile_btn_row_67.grid_columnconfigure(1, weight=1)
+
+def rizz_refresh_profile_list_67():
+    skibidy_profile_listbox_67.delete(0, "end")
+    db = _skibidy_read_configs_db_67()
+    for name in sorted(db.keys()):
+        skibidy_profile_listbox_67.insert("end", name)
+
+def sigma_load_named_profile_67():
+    sel = skibidy_profile_listbox_67.curselection()
+    if not sel:
+        return
+    name = skibidy_profile_listbox_67.get(sel[0])
+    db = _skibidy_read_configs_db_67()
+    if name not in db:
+        return
+    _skibidy_apply_settings_67(db[name])
+    rizz_config_name_var_67.set(name)
+    skibidy_refresh_locked_label_67()
+    skibidy_refresh_value_labels_67()
+    rizz_update_verify_params_67()
+
+def skibidy_delete_named_profile_67():
+    sel = skibidy_profile_listbox_67.curselection()
+    if not sel:
+        return
+    name = skibidy_profile_listbox_67.get(sel[0])
     try:
-        if not os.path.exists("settings.json"):
-            return
-        if os.path.getsize("settings.json") == 0:
-            return
-        with open("settings.json", "r") as f:
+        os.remove(_rizz_profile_path_67(name))
+    except Exception:
+        pass
+    rizz_refresh_profile_list_67()
+
+def sigma_rename_named_profile_67():
+    sel = skibidy_profile_listbox_67.curselection()
+    if not sel:
+        return
+    old = skibidy_profile_listbox_67.get(sel[0])
+    new = rizz_config_name_var_67.get().strip()
+    if not new or new == old:
+        return
+    try:
+        os.replace(_rizz_profile_path_67(old), _rizz_profile_path_67(new))
+    except Exception:
+        pass
+    rizz_refresh_profile_list_67()
+
+skibidy_btn_rename_67 = customtkinter.CTkButton(
+    skibidy_profile_btn_row_67, text=rizz_T_67("btn_rename"), command=sigma_rename_named_profile_67,
+    fg_color=RIZZ_PRIMARY_67, hover_color=SKIBIDY_PRIMARY_HOV_67, text_color=SKIBIDY_TEXT_LIGHT_67,
+    height=30, corner_radius=4, font=("Segoe UI", 11))
+skibidy_btn_rename_67.grid(row=0, column=0, sticky="ew", padx=(0, 3))
+sigma_reg_67(skibidy_btn_rename_67, "btn_rename")
+
+skibidy_btn_delete_67 = customtkinter.CTkButton(
+    skibidy_profile_btn_row_67, text=rizz_T_67("btn_delete"), command=skibidy_delete_named_profile_67,
+    fg_color="transparent", border_width=1, border_color=SIGMA_DANGER_67,
+    hover_color=RIZZ_PRIMARY_67, text_color=SIGMA_DANGER_67, height=30, corner_radius=4,
+    font=("Segoe UI", 11))
+skibidy_btn_delete_67.grid(row=0, column=1, sticky="ew", padx=(3, 0))
+sigma_reg_67(skibidy_btn_delete_67, "btn_delete")
+
+skibidy_btn_load_named_67 = customtkinter.CTkButton(
+    skibidy_card_profile_67, text=rizz_T_67("btn_load_sel"), command=sigma_load_named_profile_67,
+    fg_color=SIGMA_ACCENT_67, hover_color=RIZZ_ACCENT_HOV_67, text_color="#ffffff",
+    height=32, corner_radius=4, font=("Segoe UI", 11, "bold"))
+skibidy_btn_load_named_67.grid(row=3, column=0, columnspan=2, sticky="ew",
+                               padx=12, pady=(0, 12))
+sigma_reg_67(skibidy_btn_load_named_67, "btn_load_sel")
+
+rizz_section_label_67(skibidy_page_cfg_67, "sec_storage")
+
+skibidy_card_auto2_67 = customtkinter.CTkFrame(skibidy_page_cfg_67, fg_color=RIZZ_BG_CARD_67, corner_radius=6)
+skibidy_card_auto2_67.pack(fill="x", padx=14, pady=3)
+skibidy_autosave_lbl_67 = customtkinter.CTkLabel(skibidy_card_auto2_67, text=rizz_T_67("autosave_text"),
+                                                 font=("Segoe UI", 10),
+                                                 text_color=SIGMA_TEXT_DIM_67, anchor="w",
+                                                 justify="left")
+skibidy_autosave_lbl_67.pack(fill="x", padx=12, pady=8)
+sigma_reg_67(skibidy_autosave_lbl_67, "autosave_text")
+
+skibidy_card_path_67 = customtkinter.CTkFrame(skibidy_page_cfg_67, fg_color=RIZZ_BG_CARD_67, corner_radius=6)
+skibidy_card_path_67.pack(fill="x", padx=14, pady=3)
+customtkinter.CTkLabel(skibidy_card_path_67, text=SKIBIDY_CONFIGS_DIR_67,
+                       font=("Consolas", 10), text_color=SIGMA_TEXT_DIM_67,
+                       anchor="w").pack(fill="x", padx=12, pady=8)
+
+def skibidy_open_configs_folder_67():
+    try:
+        os.startfile(SKIBIDY_CONFIGS_DIR_67)
+    except Exception:
+        pass
+
+customtkinter.CTkButton(
+    skibidy_page_cfg_67, text="Open configs folder", command=skibidy_open_configs_folder_67,
+    fg_color=RIZZ_PRIMARY_67, hover_color=SKIBIDY_PRIMARY_HOV_67, text_color=SKIBIDY_TEXT_LIGHT_67,
+    height=28, corner_radius=4, font=("Segoe UI", 11)).pack(
+        fill="x", padx=14, pady=(3, 3))
+
+def skibidy_do_reset_all_67():
+    if not messagebox.askyesno(rizz_T_67("confirm_reset_title"),
+                               rizz_T_67("confirm_reset_msg")):
+        return
+    global rizz_active_ranges_67, sigma_palette_data_67
+    global sigma_locked_hex_67, skibidy_locked_hsv_67
+    rizz_active_ranges_67 = []
+    sigma_palette_data_67 = []
+    sigma_locked_hex_67 = ""
+    skibidy_locked_hsv_67 = None
+    try:
+        for fn in os.listdir(SKIBIDY_CONFIGS_DIR_67):
+            if fn.endswith(".json"):
+                os.remove(os.path.join(SKIBIDY_CONFIGS_DIR_67, fn))
+    except Exception:
+        pass
+    rizz_refresh_palette_ui_67()
+    skibidy_refresh_locked_label_67()
+    rizz_refresh_profile_list_67()
+
+skibidy_btn_reset_67 = customtkinter.CTkButton(
+    skibidy_page_cfg_67, text=rizz_T_67("btn_reset_all"), command=skibidy_do_reset_all_67,
+    fg_color="transparent", border_width=1, border_color=SIGMA_DANGER_67,
+    hover_color=RIZZ_PRIMARY_67, text_color=SIGMA_DANGER_67, height=30, corner_radius=4,
+    font=("Segoe UI", 11))
+skibidy_btn_reset_67.pack(fill="x", padx=14, pady=(6, 12))
+sigma_reg_67(skibidy_btn_reset_67, "btn_reset_all")
+
+def skibidy_switch_tab_67(key):
+    sigma_active_tab_67["name"] = key
+    for k, p in rizz_pages_67.items():
+        if k == key:
+            p.pack(fill="both", expand=True)
+        else:
+            p.pack_forget()
+    titles = {
+        "aim": rizz_T_67("nav_aim"),
+        "visual": rizz_T_67("nav_visual"),
+        "enemy": rizz_T_67("nav_filter"),
+        "misc": rizz_T_67("nav_adv"),
+        "config": rizz_T_67("nav_prof"),
+    }
+    skibidy_top_title_67.configure(text=titles.get(key, key.title()))
+    sigma_paint_nav_67()
+
+def _sigma_collect_settings_67():
+    return {
+        "sigma_skibidy_rizz_67_hex": skibidy_hex_var_67.get(),
+        "sigma_skibidy_rizz_67_tol_h": int(rizz_tol_h_var_67.get()),
+        "sigma_skibidy_rizz_67_tol_s": int(sigma_tol_s_var_67.get()),
+        "sigma_skibidy_rizz_67_tol_v": int(skibidy_tol_v_var_67.get()),
+        "sigma_skibidy_rizz_67_lock_strength": sigma_round_to_2_67(rizz_strength_var_67.get()),
+        "sigma_skibidy_rizz_67_stability": sigma_round_to_2_67(sigma_stability_var_67.get()),
+        "sigma_skibidy_rizz_67_pf_mouse_sensitivity": float(skibidy_pf_mouse_var_67.get()),
+        "sigma_skibidy_rizz_67_pf_aim_sensitivity": float(rizz_pf_aim_var_67.get()),
+        "sigma_skibidy_rizz_67_roblox_sensitivity": float(sigma_roblox_sens_var_67.get()),
+        "sigma_skibidy_rizz_67_max_step": int(skibidy_max_step_var_67.get()),
+        "sigma_skibidy_rizz_67_deadzone": int(rizz_deadzone_var_67.get()),
+        "sigma_skibidy_rizz_67_fov": int(sigma_fov_var_67.get()),
+        "sigma_skibidy_rizz_67_offset_x": int(skibidy_offset_x_var_67.get()),
+        "sigma_skibidy_rizz_67_offset_y": int(rizz_offset_y_var_67.get()),
+        "sigma_skibidy_rizz_67_show_fov": bool(sigma_show_fov_var_67.get()),
+        "sigma_skibidy_rizz_67_show_crosshair": bool(skibidy_show_crosshair_var_67.get()),
+        "sigma_skibidy_rizz_67_exclude_capture": bool(rizz_exclude_capture_var_67.get()),
+        "sigma_skibidy_rizz_67_folder": skibidy_folder_var_67.get(),
+        "sigma_skibidy_rizz_67_skip_dark": bool(rizz_skip_dark_var_67.get()),
+        "sigma_skibidy_rizz_67_skip_gray": bool(sigma_skip_gray_var_67.get()),
+        "sigma_skibidy_rizz_67_aim_vk": int(rizz_current_aim_vk_67),
+        "sigma_skibidy_rizz_67_toggle_vk": int(sigma_current_toggle_vk_67),
+        "sigma_skibidy_rizz_67_palette": sigma_palette_data_67,
+        "sigma_skibidy_rizz_67_verify_enabled": bool(rizz_verify_enabled_67),
+        "sigma_skibidy_rizz_67_verify_hexes": list(sigma_verify_hex_list_67),
+        "sigma_skibidy_rizz_67_verify_tol_h": int(skibidy_verify_tol_h_67),
+        "sigma_skibidy_rizz_67_verify_tol_s": int(rizz_verify_tol_s_67),
+        "sigma_skibidy_rizz_67_verify_tol_v": int(sigma_verify_tol_v_67),
+        "sigma_skibidy_rizz_67_verify_roi": int(skibidy_verify_roi_67),
+        "sigma_skibidy_rizz_67_verify_min_px": int(rizz_verify_min_px_67),
+        "sigma_skibidy_rizz_67_verify_frames": int(sigma_verify_frames_required_67),
+        "sigma_skibidy_rizz_67_movement_comp": float(sigma_movement_compensation_67),
+        "sigma_skibidy_rizz_67_kp": float(sigma_kp_67),
+        "sigma_skibidy_rizz_67_kd": float(skibidy_kd_67),
+        "sigma_skibidy_rizz_67_roi_radius": int(sigma_roi_radius_67),
+        "sigma_skibidy_rizz_67_locked_hex": sigma_locked_hex_67,
+        "sigma_skibidy_rizz_67_locked_hsv": list(skibidy_locked_hsv_67) if skibidy_locked_hsv_67 else None,
+        "sigma_skibidy_rizz_67_ov_show_box": bool(sigma_ov_show_box_var_67.get()),
+        "sigma_skibidy_rizz_67_ov_show_fps": bool(skibidy_ov_show_fps_var_67.get()),
+        "sigma_skibidy_rizz_67_ov_show_aim_line": bool(rizz_ov_show_aim_line_var_67.get()),
+        "sigma_skibidy_rizz_67_ov_hide_idle": bool(sigma_ov_hide_idle_var_67.get()),
+        "sigma_skibidy_rizz_67_ov_rainbow": bool(skibidy_ov_rainbow_var_67.get()),
+        "sigma_skibidy_rizz_67_ov_color": rizz_ov_color_var_67.get(),
+        "sigma_skibidy_rizz_67_ch_style": sigma_ch_style_internal_67["v"],
+        "sigma_skibidy_rizz_67_ch_size": int(rizz_ch_size_var_67.get()),
+        "sigma_skibidy_rizz_67_lang": sigma_current_lang_67,
+    }
+
+def _skibidy_apply_settings_67(data):
+    global rizz_current_aim_vk_67, sigma_current_toggle_vk_67
+    global rizz_active_ranges_67, sigma_palette_data_67
+    global rizz_verify_enabled_67, skibidy_verify_tol_h_67, rizz_verify_tol_s_67
+    global sigma_verify_tol_v_67, skibidy_verify_roi_67, rizz_verify_min_px_67
+    global sigma_verify_frames_required_67, sigma_verify_hex_list_67
+    global sigma_locked_hex_67, skibidy_locked_hsv_67
+    global sigma_movement_compensation_67, sigma_kp_67, skibidy_kd_67, sigma_roi_radius_67
+    global sigma_current_lang_67
+
+    if not isinstance(data, dict):
+        return
+
+    p = "sigma_skibidy_rizz_67_"
+
+    skibidy_hex_var_67.set(data.get(p + "hex", "#feffb2"))
+    rizz_tol_h_var_67.set(data.get(p + "tol_h", 10))
+    sigma_tol_s_var_67.set(data.get(p + "tol_s", 60))
+    skibidy_tol_v_var_67.set(data.get(p + "tol_v", 60))
+    rizz_strength_var_67.set(sigma_round_to_2_67(data.get(p + "lock_strength", 1.0)))
+    sigma_stability_var_67.set(sigma_round_to_2_67(data.get(p + "stability", 0.82)))
+    skibidy_max_step_var_67.set(data.get(p + "max_step", 6))
+    rizz_deadzone_var_67.set(data.get(p + "deadzone", 6))
+    sigma_fov_var_67.set(data.get(p + "fov", 80))
+    skibidy_offset_x_var_67.set(data.get(p + "offset_x", 0))
+    rizz_offset_y_var_67.set(data.get(p + "offset_y", 0))
+    skibidy_pf_mouse_var_67.set(data.get(p + "pf_mouse_sensitivity", 0.5))
+    rizz_pf_aim_var_67.set(data.get(p + "pf_aim_sensitivity", 1.0))
+    sigma_roblox_sens_var_67.set(data.get(p + "roblox_sensitivity", 0.55))
+    sigma_show_fov_var_67.set(data.get(p + "show_fov", False))
+    skibidy_show_crosshair_var_67.set(data.get(p + "show_crosshair", False))
+    rizz_exclude_capture_var_67.set(data.get(p + "exclude_capture", False))
+    skibidy_folder_var_67.set(data.get(p + "folder", "images"))
+    rizz_skip_dark_var_67.set(data.get(p + "skip_dark", True))
+    sigma_skip_gray_var_67.set(data.get(p + "skip_gray", True))
+
+    rizz_current_aim_vk_67 = int(data.get(p + "aim_vk", 0x02))
+    sigma_current_toggle_vk_67 = int(data.get(p + "toggle_vk", 0x77))
+    try:
+        skibidy_aim_vk_btn_67.configure(text=rizz_vk_display_67(rizz_current_aim_vk_67))
+        rizz_toggle_vk_btn_67.configure(text=rizz_vk_display_67(sigma_current_toggle_vk_67))
+    except Exception:
+        pass
+
+    pal = data.get(p + "palette", [])
+    sigma_palette_data_67 = pal if isinstance(pal, list) else []
+
+    rizz_verify_enabled_67 = bool(data.get(p + "verify_enabled", False))
+    sigma_verify_hex_list_67 = data.get(p + "verify_hexes", ["#3AA0FF"]) or ["#3AA0FF"]
+    skibidy_verify_tol_h_67 = int(data.get(p + "verify_tol_h", 12))
+    rizz_verify_tol_s_67 = int(data.get(p + "verify_tol_s", 70))
+    sigma_verify_tol_v_67 = int(data.get(p + "verify_tol_v", 70))
+    skibidy_verify_roi_67 = int(data.get(p + "verify_roi", 40))
+    rizz_verify_min_px_67 = int(data.get(p + "verify_min_px", 8))
+    sigma_verify_frames_required_67 = max(1, int(data.get(p + "verify_frames", 1)))
+
+    sigma_movement_compensation_67 = float(data.get(p + "movement_comp", 0.0))
+    sigma_kp_67 = float(data.get(p + "kp", 0.45))
+    skibidy_kd_67 = float(data.get(p + "kd", 0.25))
+    sigma_roi_radius_67 = int(data.get(p + "roi_radius", 50))
+
+    sigma_ov_show_box_var_67.set(data.get(p + "ov_show_box", True))
+    skibidy_ov_show_fps_var_67.set(data.get(p + "ov_show_fps", True))
+    rizz_ov_show_aim_line_var_67.set(data.get(p + "ov_show_aim_line", False))
+    sigma_ov_hide_idle_var_67.set(data.get(p + "ov_hide_idle", False))
+    skibidy_ov_rainbow_var_67.set(data.get(p + "ov_rainbow", False))
+    rizz_ov_color_var_67.set(data.get(p + "ov_color", "#ff4040"))
+
+    sigma_ch_style_internal_67["v"] = data.get(p + "ch_style", "cross")
+    rizz_ch_size_var_67.set(int(data.get(p + "ch_size", 12)))
+
+    new_lang = data.get(p + "lang", sigma_current_lang_67)
+    if new_lang in ("th", "en") and new_lang != sigma_current_lang_67:
+        sigma_current_lang_67 = new_lang
+
+    try:
+        sigma_verify_enable_var_67.set(rizz_verify_enabled_67)
+        skibidy_verify_hexes_var_67.set(", ".join(sigma_verify_hex_list_67))
+        rizz_verify_tol_h_var_67.set(skibidy_verify_tol_h_67)
+        sigma_verify_tol_s_var_67.set(rizz_verify_tol_s_67)
+        skibidy_verify_tol_v_var_67.set(sigma_verify_tol_v_67)
+        rizz_verify_roi_var_67.set(skibidy_verify_roi_67)
+        sigma_verify_minpx_var_67.set(rizz_verify_min_px_67)
+        skibidy_verify_frames_var_67.set(sigma_verify_frames_required_67)
+        rizz_movement_compensation_var_67.set(sigma_movement_compensation_67)
+        sigma_kp_var_67.set(sigma_kp_67)
+        skibidy_kd_var_67.set(skibidy_kd_67)
+        rizz_roi_radius_var_67.set(sigma_roi_radius_67)
+        skibidy_ch_style_var_67.set(rizz_T_67(f"ch_{sigma_ch_style_internal_67['v']}"))
+    except Exception:
+        pass
+
+    sigma_locked_hex_67 = data.get(p + "locked_hex", "")
+    lh = data.get(p + "locked_hsv", None)
+    skibidy_locked_hsv_67 = tuple(lh) if isinstance(lh, (list, tuple)) and len(lh) == 3 else None
+    if not sigma_locked_hex_67 and skibidy_hex_var_67.get():
+        sigma_set_locked_hex_67(skibidy_hex_var_67.get())
+
+    skibidy_rebuild_verify_ranges_67()
+    rizz_update_swatch_67(skibidy_swatch_canvas_67, skibidy_hex_var_67.get())
+    skibidy_update_params_67()
+    _skibidy_update_ov_swatch_67()
+    rizz_apply_lang_67()
+
+def sigma_load_settings_67():
+    data = None
+    for path in (RIZZ_LAST_SESSION_FILE_67, SIGMA_LEGACY_SETTINGS_FILE_67):
+        if os.path.exists(path) and os.path.getsize(path) > 0:
             try:
-                data = json.load(f)
-            except json.JSONDecodeError:
-                print("Settings file is corrupted. Using defaults.")
-                return
-        _profile_apply(data)
-    except Exception as e:
-        print(f"Error loading settings: {e}")
+                with open(path, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                break
+            except Exception:
+                continue
+    if data:
+        _skibidy_apply_settings_67(data)
 
-
-def save_settings():
+def sigma_save_settings_67():
     try:
-        with open("settings.json", "w") as f:
-            json.dump(_profile_snapshot(), f, indent=2)
+        with open(RIZZ_LAST_SESSION_FILE_67, "w", encoding="utf-8") as f:
+            json.dump(_sigma_collect_settings_67(), f, indent=2)
     except Exception as e:
-        print(f"Error saving settings: {e}")
+        print(f"[settings] save failed: {e}")
 
+def skibidy_on_close_67():
+    skibidy_stop_worker_67()
+    sigma_save_settings_67()
+    try:
+        if skibidy_overlay_67 and skibidy_overlay_67.winfo_exists():
+            skibidy_overlay_67.destroy()
+    except Exception:
+        pass
+    rizz_root_67.destroy()
 
-def on_close():
-    stop_worker()
-    save_settings()
-    root.destroy()
+_rizz_last_running_67 = False
 
+def sigma_poll_state_67():
+    global _rizz_last_running_67, sigma_rainbow_hue_67
+    if rizz_running_67 != _rizz_last_running_67:
+        _rizz_last_running_67 = rizz_running_67
+        rizz_refresh_start_stop_btn_67()
 
-load_settings()
-refresh_profile_list()
-update_params()
-root.update_idletasks()
+    if skibidy_ov_rainbow_var_67.get():
+        sigma_rainbow_hue_67 = (sigma_rainbow_hue_67 + 6) % 360
 
-root.after(150, startup_image_scan)
-root.after(200, poll_live_status)
-root.protocol("WM_DELETE_WINDOW", on_close)
-root.mainloop()
+    try:
+        if (sigma_show_fov_var_67.get() or skibidy_show_crosshair_var_67.get()
+                or sigma_ov_show_box_var_67.get() or skibidy_ov_show_fps_var_67.get()
+                or rizz_ov_show_aim_line_var_67.get()):
+            skibidy_update_overlay_67()
+    except Exception:
+        pass
+
+    try:
+        if not rizz_verify_enabled_67:
+            skibidy_diag_lbl_67.configure(
+                text=f"{rizz_T_67('lbl_marker_diag')} filter OFF -> lock by main color only",
+                text_color=SIGMA_TEXT_DIM_67)
+        elif sigma_last_verify_px_67 < 0:
+            skibidy_diag_lbl_67.configure(text=rizz_T_67("lbl_marker_diag"),
+                                          text_color=SIGMA_TEXT_DIM_67)
+        else:
+            thr = int(sigma_verify_minpx_var_67.get())
+            marker_present = sigma_last_verify_px_67 >= thr
+            if marker_present:
+                verdict = "CONDITION FOUND -> LOCK"
+                color = SIGMA_ACCENT_67
+            else:
+                verdict = "CONDITION MISSING -> SKIP"
+                color = SIGMA_DANGER_67
+            skibidy_diag_lbl_67.configure(
+                text=f"{rizz_T_67('lbl_marker_diag')} {sigma_last_verify_px_67}  "
+                     f"(thr {thr}) -> {verdict}",
+                text_color=color)
+    except Exception:
+        pass
+
+    rizz_root_67.after(50, sigma_poll_state_67)
+
+def sigma_startup_scan_67(retries=3):
+    try:
+        sigma_load_settings_67()
+    except Exception as e:
+        print(f"[startup load] {e}")
+    try:
+        sigma_analyze_images_folder_67()
+    except Exception as e:
+        print(f"[startup scan] {e}")
+    if not sigma_palette_data_67 and retries > 0:
+        rizz_root_67.after(500, lambda: sigma_startup_scan_67(retries - 1))
+        return
+    if not rizz_active_ranges_67 and sigma_palette_data_67:
+        skibidy_selected_palette_index_67.set(0)
+        rizz_lock_selected_color_67()
+
+skibidy_switch_tab_67("aim")
+sigma_load_settings_67()
+skibidy_refresh_value_labels_67()
+skibidy_update_params_67()
+rizz_refresh_palette_ui_67()
+skibidy_refresh_locked_label_67()
+skibidy_rebuild_verify_ranges_67()
+rizz_update_verify_params_67()
+rizz_refresh_profile_list_67()
+rizz_refresh_start_stop_btn_67()
+rizz_apply_lang_67()
+
+rizz_root_67.after(600, lambda: globals().update({"_rizz_auto_save_ready_67": True}))
+
+if rizz_exclude_capture_var_67.get():
+    rizz_root_67.after(150, sigma_on_capture_exclude_toggle_67)
+
+def _rizz_color_titlebar_67():
+    try:
+        rizz_root_67.update_idletasks()
+        hwnd = sigma_user32.GetParent(rizz_root_67.winfo_id()) or rizz_root_67.winfo_id()
+        skibidy_set_titlebar_color_67(hwnd, SIGMA_TITLEBAR_BG_67)
+    except Exception:
+        pass
+
+rizz_root_67.after(60, _rizz_color_titlebar_67)
+rizz_root_67.after(400, sigma_startup_scan_67)
+rizz_root_67.after(400, sigma_poll_state_67)
+rizz_root_67.protocol("WM_DELETE_WINDOW", skibidy_on_close_67)
+rizz_root_67.mainloop()
