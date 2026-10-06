@@ -47,7 +47,7 @@
 
 Overview: color-based aiming assistant using OpenCV + MSS. It captures a centered screen region, builds a color mask to locate targets, then moves the mouse smoothly with filters and dynamic parameter adjustments.
 
-![App screenshot](image.png)
+![App screenshot](imagee.png)
 
 ### Key Features
 - Clean, balanced UI with language toggle (EN/TH)
